@@ -880,7 +880,7 @@ Quy tắc bắt buộc:
           - Nếu closing cash > 550 triệu: Nội dung bắt buộc sinh ra: "Projected Closing Cash hiện tại là {closing_cash}, lớn hơn hoặc bằng mốc 550 triệu VND. Khả năng thanh khoản của dự án được đảm bảo."
       (3) Đánh giá confidence score: 
           - Nếu confidence_score < 0.65 :Nội dung bắt buộc sinh ra: "Confidence Score hiện tại là {confidence_score}, bé hơn mức 0.65 (Kích hoạt RR-006 do RR-002 đã cảnh báo). Mức độ tin cậy của dữ liệu dự phóng thấp, cần rà soát lại đầu vào."
-          - Nếu confidence_score > 0.65: "Confidence Score hiện tại là {confidence_score} (Không kích hoạt RR-006). Mức độ tin cậy của dữ liệu ở mức có thể chấp nhận để ra quyết định."
+          - Nếu confidence_score > 0.65: "Confidence Score hiện tại là {confidence_score} (Không kích hoạt RR-006). Mức độ tin cậy của dữ liệu ở mức cao hơn 65% và có thể chấp nhận để ra quyết định."
       Mỗi lý do phải nêu rõ số liệu cụ thể (giá trị chỉ số) và rule liên quan nếu có kích hoạt,
       không được viết chung chung hay gộp nhiều chỉ số vào 1 lý do.
 - protection_condition phải là một điều kiện thương mại hoặc kiểm soát cụ thể cần Founder xác nhận.
