@@ -2064,7 +2064,9 @@ with tab_dashboard:
 # ============================================================
 # NEWBIE BRANDING HEADER
 # ============================================================
-st.markdown("""
+import streamlit.components.v1 as components
+
+components.html("""
 <style>
 .fullscreen-btn {
     position: fixed;
@@ -2080,23 +2082,24 @@ st.markdown("""
     font-size: 0.9rem;
     cursor: pointer;
     box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-    transition: transform 0.2s;
-}
-.fullscreen-btn:hover {
-    transform: translateY(-2px);
 }
 </style>
-<button class="fullscreen-btn" onclick="
-    var elem = document.documentElement;
-    if (!document.fullscreenElement) {
+<button class="fullscreen-btn" id="fsBtn">⛶ Toàn màn hình</button>
+<script>
+document.getElementById("fsBtn").addEventListener("click", function() {
+    var elem = window.parent.document.documentElement;
+    if (!window.parent.document.fullscreenElement) {
         elem.requestFullscreen().catch(function(err) {
-            alert('Không thể bật toàn màn hình: ' + err.message);
+            console.log("Lỗi fullscreen:", err.message);
         });
     } else {
-        document.exitFullscreen();
+        window.parent.document.exitFullscreen();
     }
-">⛶ Toàn màn hình</button>
-""", unsafe_allow_html=True)
+});
+</script>
+""", height=0, width=0)
+
+
 
 st.markdown('''
 <style>
