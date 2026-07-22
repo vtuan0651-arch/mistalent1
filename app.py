@@ -2064,6 +2064,40 @@ with tab_dashboard:
 # ============================================================
 # NEWBIE BRANDING HEADER
 # ============================================================
+st.markdown("""
+<style>
+.fullscreen-btn {
+    position: fixed;
+    bottom: 15px;
+    right: 20px;
+    z-index: 999999;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 99px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    transition: transform 0.2s;
+}
+.fullscreen-btn:hover {
+    transform: translateY(-2px);
+}
+</style>
+<button class="fullscreen-btn" onclick="
+    var elem = document.documentElement;
+    if (!document.fullscreenElement) {
+        elem.requestFullscreen().catch(function(err) {
+            alert('Không thể bật toàn màn hình: ' + err.message);
+        });
+    } else {
+        document.exitFullscreen();
+    }
+">⛶ Toàn màn hình</button>
+""", unsafe_allow_html=True)
+
 st.markdown('''
 <style>
 .newbie-header {
