@@ -1954,7 +1954,7 @@ with tab_dashboard:
             if sensitive:
                 st.markdown(f"""
 <div class="dash-container" style="background: #fdf2f8; border-left: 4px solid #f43f5e; padding: 16px 20px; border-radius: 0 12px 12px 0; margin-bottom: 20px;">
-<div style="color: #be123c; font-weight: 700; font-size: 0.85rem; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">⚠️ Hợp đồng vượt ngưỡng nhạy cảm</div>
+<div style="color: #be123c; font-weight: 700; font-size: 0.85rem; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">⚠️ CẢNH BÁO </div>
 <div style="color: #9f1239; font-size: 0.95rem; line-height: 1.5;">{decision['approval_reason']}</div>
 </div>
                 """, unsafe_allow_html=True)
