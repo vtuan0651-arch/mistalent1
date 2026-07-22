@@ -8,7 +8,7 @@ import pandas as pd
 import streamlit as st
 from openai import OpenAI
 from pydantic import BaseModel, Field
-
+import streamlit.components.v1 as components
 
 # ============================================================
 # 1. APP CONFIG
@@ -2064,7 +2064,6 @@ with tab_dashboard:
 # ============================================================
 # NEWBIE BRANDING HEADER
 # ============================================================
-import streamlit.components.v1 as components
 
 components.html("""
 <style>
@@ -2080,20 +2079,32 @@ components.html("""
     border-radius: 99px;
     font-weight: 700;
     font-size: 0.9rem;
+    font-family: 'Inter', sans-serif;
     cursor: pointer;
     box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    transition: transform 0.2s;
+}
+.fullscreen-btn:hover {
+    transform: translateY(-2px);
 }
 </style>
+
 <button class="fullscreen-btn" id="fsBtn">⛶ Toàn màn hình</button>
+
 <script>
 document.getElementById("fsBtn").addEventListener("click", function() {
-    var elem = window.parent.document.documentElement;
-    if (!window.parent.document.fullscreenElement) {
-        elem.requestFullscreen().catch(function(err) {
+    var parentDoc = window.parent.document;
+    var elem = parentDoc.documentElement;
+    if (!parentDoc.fullscreenElement) {
+        elem.requestFullscreen().then(function() {
+            document.getElementById("fsBtn").innerText = "⛶ Thoát toàn màn hình";
+        }).catch(function(err) {
             console.log("Lỗi fullscreen:", err.message);
         });
     } else {
-        window.parent.document.exitFullscreen();
+        parentDoc.exitFullscreen().then(function() {
+            document.getElementById("fsBtn").innerText = "⛶ Toàn màn hình";
+        });
     }
 });
 </script>
