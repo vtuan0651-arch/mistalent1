@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIS Portal & Workspace | System Dashboard</title>
+    <meta name="description"
+        content="A premium, state-of-the-art Management Information Systems (MIS) workspace template for system monitoring, reporting, and operational analytics.">
+
+    <!-- Remix Icon for Modern Vector Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+
+    <!-- External Custom Stylesheet -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation Component -->
+        <aside class="sidebar" id="app-sidebar">
+            <div class="sidebar-header">
+                <div class="brand">
+                    <div class="brand-icon">M</div>
+                    <span class="brand-name">MIS Workspace</span>
+                </div>
+                <button class="collapse-btn" id="sidebar-collapse-btn" aria-label="Collapse Sidebar"
+                    title="Collapse Sidebar">
+                    <i class="ri-menu-fold-line"></i>
+                </button>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section-title">Operations</div>
+                <ul class="nav-list">
+                    <li class="nav-item active">
+                        <a href="#" class="nav-item-link" id="nav-dashboard">
+                            <i class="ri-dashboard-line"></i>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-item-link" id="nav-analytics">
+                            <i class="ri-bar-chart-2-line"></i>
+                            <span>Analytics</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-item-link" id="nav-departments">
+                            <i class="ri-government-line"></i>
+                            <span>Departments</span>
+                        </a>
+                    </li>
+                </ul>
+
+                <div class="nav-section-title">Administration</div>
+                <ul class="nav-list">
+                    <li class="nav-item">
+                        <a href="#" class="nav-item-link" id="nav-users">
+                            <i class="ri-user-settings-line"></i>
+                            <span>User Access</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-item-link" id="nav-settings">
+                            <i class="ri-settings-4-line"></i>
+                            <span>System Settings</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-avatar" id="user-profile-avatar">AD</div>
+                <div class="user-info">
+                    <span class="user-name">Admin Director</span>
+                    <span class="user-role">Super Administrator</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace Area -->
+        <div class="main-wrapper">
+            <!-- Top Navigation Header -->
+            <header class="navbar" id="app-navbar">
+                <div class="navbar-left">
+                    <button class="nav-toggle-mobile" id="nav-toggle-mobile-btn" aria-label="Toggle Sidebar Menu">
+                        <i class="ri-menu-2-line"></i>
+                    </button>
+                    <div class="search-wrapper">
+                        <i class="ri-search-line"></i>
+                        <input type="text" class="search-input" id="search-input"
+                            placeholder="Search files, logs, or departments...">
+                    </div>
+                </div>
+
+                <div class="navbar-right">
+                    <button class="nav-action-btn theme-toggle" id="theme-toggle-btn" aria-label="Toggle Color Theme"
+                        title="Toggle Color Theme">
+                        <i class="ri-moon-line"></i>
+                    </button>
+                    <button class="nav-action-btn" id="notifications-btn" aria-label="Notifications"
+                        title="Notifications">
+                        <i class="ri-notification-3-line"></i>
+                        <span class="badge-dot"></span>
+                    </button>
+                    <button class="nav-action-btn" id="help-btn" aria-label="Help Center" title="Help Center">
+                        <i class="ri-question-line"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Page Body Content -->
+            <main class="content-body" id="app-content-body">
+                <!-- Page Title Section -->
+                <div class="page-header">
+                    <div>
+                        <h1 class="page-title">Operations Control Center</h1>
+                        <p class="page-subtitle">Real-time status overview of MIS systems and departmental reports</p>
+                    </div>
+                    <button class="btn-primary" id="add-record-btn" aria-haspopup="dialog">
+                        <i class="ri-add-line"></i>
+                        <span>Add New Record</span>
+                    </button>
+                </div>
+
+                <!-- KPI Metric Grid Cards -->
+                <section class="dashboard-grid">
+                    <!-- Total Systems Card -->
+                    <div class="kpi-card" id="kpi-card-systems">
+                        <div class="kpi-info">
+                            <span class="kpi-label">Total Logs/Records</span>
+                            <span class="kpi-value" id="kpi-total-records">4</span>
+                            <span class="kpi-trend up">
+                                <i class="ri-arrow-up-line"></i>
+                                <span>+12.4% this week</span>
+                            </span>
+                        </div>
+                        <div class="kpi-icon-wrapper">
+                            <i class="ri-database-2-line"></i>
+                        </div>
+                    </div>
+
+                    <!-- Active Departments Card -->
+                    <div class="kpi-card cyan" id="kpi-card-departments">
+                        <div class="kpi-info">
+                            <span class="kpi-label">Active Systems</span>
+                            <span class="kpi-value" id="kpi-active-systems">3</span>
+                            <span class="kpi-trend up">
+                                <i class="ri-arrow-up-line"></i>
+                                <span>Optimal latency</span>
+                            </span>
+                        </div>
+                        <div class="kpi-icon-wrapper">
+                            <i class="ri-pulse-line"></i>
+                        </div>
+                    </div>
+
+                    <!-- Server Load Card -->
+                    <div class="kpi-card pink" id="kpi-card-uptime">
+                        <div class="kpi-info">
+                            <span class="kpi-label">System Uptime</span>
+                            <span class="kpi-value" id="kpi-uptime-value">99.98%</span>
+                            <span class="kpi-trend up">
+                                <i class="ri-shield-check-line"></i>
+                                <span>SLA compliant</span>
+                            </span>
+                        </div>
+                        <div class="kpi-icon-wrapper">
+                            <i class="ri-server-line"></i>
+                        </div>
+                    </div>
+
+                    <!-- Pending Tasks Card -->
+                    <div class="kpi-card green" id="kpi-card-errors">
+                        <div class="kpi-info">
+                            <span class="kpi-label">Total Transactions</span>
+                            <span class="kpi-value" id="kpi-transactions-value">$142.8k</span>
+                            <span class="kpi-trend up">
+                                <i class="ri-arrow-up-line"></i>
+                                <span>+8.2% vs yesterday</span>
+                            </span>
+                        </div>
+                        <div class="kpi-icon-wrapper">
+                            <i class="ri-money-dollar-circle-line"></i>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Visualization Panel (Chart & Activities) -->
+                <div class="visuals-grid">
+                    <!-- Left: Analytics Line Chart -->
+                    <div class="card" id="analytics-chart-card">
+                        <div class="card-header">
+                            <h2 class="card-title">Performance & Resource Metrics</h2>
+                            <i class="ri-more-2-fill card-action-menu" title="Chart Options"></i>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="analytics-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Right: Quick Activities Feed -->
+                    <div class="card" id="recent-activities-card">
+                        <div class="card-header">
+                            <h2 class="card-title">Recent System Logs</h2>
+                            <i class="ri-more-2-fill card-action-menu" title="Activity Options"></i>
+                        </div>
+                        <div class="activity-feed">
+                            <div class="activity-item">
+                                <div class="activity-icon">
+                                    <i class="ri-login-box-line"></i>
+                                </div>
+                                <div class="activity-details">
+                                    <span class="activity-title">User login: Admin Director</span>
+                                    <span class="activity-time">2 mins ago • IP: 192.168.1.45</span>
+                                </div>
+                            </div>
+                            <div class="activity-item">
+                                <div class="activity-icon secondary">
+                                    <i class="ri-file-chart-line"></i>
+                                </div>
+                                <div class="activity-details">
+                                    <span class="activity-title">Report generated: Q2 Financials</span>
+                                    <span class="activity-time">45 mins ago • By: FinDept</span>
+                                </div>
+                            </div>
+                            <div class="activity-item">
+                                <div class="activity-icon accent">
+                                    <i class="ri-settings-line"></i>
+                                </div>
+                                <div class="activity-details">
+                                    <span class="activity-title">System Settings updated</span>
+                                    <span class="activity-time">4 hours ago • System Update</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Table Panel -->
+                <section class="card" id="data-table-panel">
+                    <div class="card-header">
+                        <h2 class="card-title">Department System Records</h2>
+                        <i class="ri-more-2-fill card-action-menu" title="Table Action Menu"></i>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table" id="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Department</th>
+                                    <th>Status</th>
+                                    <th>Performance / Output</th>
+                                    <th>Last Updated</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="data-table-body">
+                                <tr>
+                                    <td style="font-weight: 600;">#MIS-8291</td>
+                                    <td>Finance & Accounting</td>
+                                    <td><span class="badge success">Active</span></td>
+                                    <td>94.2% Audit Score</td>
+                                    <td>Jul 19, 2026</td>
+                                    <td>
+                                        <div class="action-btn-group">
+                                            <button class="table-action-btn edit" title="Edit"><i
+                                                    class="ri-pencil-line"></i></button>
+                                            <button class="table-action-btn delete" title="Delete"><i
+                                                    class="ri-delete-bin-line"></i></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight: 600;">#MIS-4781</td>
+                                    <td>Information Technology</td>
+                                    <td><span class="badge success">Active</span></td>
+                                    <td>99.98% System Uptime</td>
+                                    <td>Jul 19, 2026</td>
+                                    <td>
+                                        <div class="action-btn-group">
+                                            <button class="table-action-btn edit" title="Edit"><i
+                                                    class="ri-pencil-line"></i></button>
+                                            <button class="table-action-btn delete" title="Delete"><i
+                                                    class="ri-delete-bin-line"></i></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight: 600;">#MIS-2019</td>
+                                    <td>Human Resources</td>
+                                    <td><span class="badge warning">Pending</span></td>
+                                    <td>82.4% Recruiting Goal</td>
+                                    <td>Jul 18, 2026</td>
+                                    <td>
+                                        <div class="action-btn-group">
+                                            <button class="table-action-btn edit" title="Edit"><i
+                                                    class="ri-pencil-line"></i></button>
+                                            <button class="table-action-btn delete" title="Delete"><i
+                                                    class="ri-delete-bin-line"></i></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight: 600;">#MIS-1102</td>
+                                    <td>Customer Operations</td>
+                                    <td><span class="badge danger">Suspended</span></td>
+                                    <td>65.8% Support SLA</td>
+                                    <td>Jul 15, 2026</td>
+                                    <td>
+                                        <div class="action-btn-group">
+                                            <button class="table-action-btn edit" title="Edit"><i
+                                                    class="ri-pencil-line"></i></button>
+                                            <button class="table-action-btn delete" title="Delete"><i
+                                                    class="ri-delete-bin-line"></i></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </main>
+
+            <!-- Footer Component -->
+            <footer class="footer" id="app-footer">
+                <p>&copy; 2026 Management Information Systems (MIS) Portal. Created with Antigravity &bull; All Rights
+                    Reserved.</p>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Modal Form for Record Entry (Popup Dialog) -->
+    <div class="modal-overlay" id="record-modal-overlay" role="dialog" aria-modal="true"
+        aria-labelledby="modal-title-text">
+        <div class="modal" id="record-modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modal-title-text">Add New Record</h3>
+                <button class="modal-close" id="modal-close-btn" aria-label="Close modal"><i
+                        class="ri-close-line"></i></button>
+            </div>
+            <form id="record-form">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="form-department" class="form-label">Department Name</label>
+                        <input type="text" id="form-department" class="form-control" required
+                            placeholder="e.g. Sales Operations">
+                    </div>
+                    <div class="form-group">
+                        <label for="form-status" class="form-label">Operational Status</label>
+                        <select id="form-status" class="form-control">
+                            <option value="Active">Active</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Suspended">Suspended</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="form-performance" class="form-label">Performance Metric / Output</label>
+                        <input type="text" id="form-performance" class="form-control" required
+                            placeholder="e.g. 92.5% Target Met">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="cancel-modal-btn">Cancel</button>
+                    <button type="submit" class="btn-primary" id="save-modal-btn">Save Record</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- App JavaScript File -->
+    <script src="js/app.js"></script>
+</body>
+
+</html>
