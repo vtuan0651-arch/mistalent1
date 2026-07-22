@@ -872,9 +872,10 @@ Quy tắc bắt buộc:
 - three_reasons phải có chính xác 3 phần tử, MỖI phần tử đánh giá đúng 1 trong 3 chỉ số
   bắt buộc theo thứ tự cố định:
       (1) Lý do về gross_margin — đối chiếu RR-003 (gross_margin < 0.28) nếu bị kích hoạt,
-      nếu không kích hoạt vẫn phải nhận xét gross_margin đang ở mức an toàn hay không.
+      nếu không kích hoạt vẫn phải nhận xét gross_margin đang ở mức an toàn hay không (bắt buộc phải so sánh đúng gross margin đang bé hơn hay lớn hơn 0.28). 
+      Nếu gross margin bé hơn 0.28 thì sẽ ảnh hưởng đến khả năng tài chính của OPC phải có đàm phán lại với khách hàng. 
       (2) Lý do về closing_cash — đối chiếu RR-002 (Projected_Closing_Cash < 550 triệu VND)
-      nếu bị kích hoạt, nếu không kích hoạt vẫn phải nhận xét khả năng thanh khoản.
+      nếu bị kích hoạt, nếu không kích hoạt vẫn phải nhận xét khả năng thanh khoản (Bắt buộc phải xác định đúng giá trị Closing cash đang bé hơn hay lớn hơn 550tr).
       (3) Lý do về confidence_score — đối chiếu RR-006 (confidence_score < 0.65, chỉ áp dụng
       khi RR-002 đã kích hoạt) nếu bị kích hoạt, nếu không kích hoạt (hoặc confidence_score
       là None) vẫn phải nhận xét mức độ tin cậy dữ liệu.
