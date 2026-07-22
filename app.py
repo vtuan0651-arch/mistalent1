@@ -947,7 +947,7 @@ def build_protection_condition(
                 "nhắc từ chối hoặc hoãn triển khai hợp đồng."
             )
         return (
-            "Giải ngân/triển khai hợp đồng theo tiến độ từng giai đoạn (phase delivery), "
+            "Thực hiện vay vốn hoặc triển khai hợp đồng theo tiến độ từng giai đoạn (phase delivery), "
             "gắn với xác nhận thanh toán của khách hàng ở mỗi giai đoạn, để bảo vệ dòng "
             "tiền dự phòng của công ty không giảm dưới ngưỡng tối thiểu."
         )
