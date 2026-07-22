@@ -2065,13 +2065,14 @@ with tab_dashboard:
 # NEWBIE BRANDING HEADER
 # ============================================================
 
-components.html("""
+st.markdown("""
 <style>
 .fullscreen-btn {
-    position: fixed;
+    position: fixed !important;
     bottom: 15px;
     right: 20px;
-    z-index: 999999;
+    z-index: 2147483647 !important;
+    pointer-events: auto !important;
     background: linear-gradient(135deg, #3b82f6, #8b5cf6);
     color: white;
     border: none;
@@ -2079,37 +2080,34 @@ components.html("""
     border-radius: 99px;
     font-weight: 700;
     font-size: 0.9rem;
-    font-family: 'Inter', sans-serif;
     cursor: pointer;
     box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-    transition: transform 0.2s;
-}
-.fullscreen-btn:hover {
-    transform: translateY(-2px);
 }
 </style>
+<button class="fullscreen-btn" id="fsBtn2">⛶ Toàn màn hình</button>
+""", unsafe_allow_html=True)
 
-<button class="fullscreen-btn" id="fsBtn">⛶ Toàn màn hình</button>
-
+st.markdown("""
 <script>
-document.getElementById("fsBtn").addEventListener("click", function() {
-    var parentDoc = window.parent.document;
-    var elem = parentDoc.documentElement;
-    if (!parentDoc.fullscreenElement) {
-        elem.requestFullscreen().then(function() {
-            document.getElementById("fsBtn").innerText = "⛶ Thoát toàn màn hình";
-        }).catch(function(err) {
-            console.log("Lỗi fullscreen:", err.message);
+setTimeout(function() {
+    var btn = window.parent.document.getElementById("fsBtn2");
+    if (btn) {
+        btn.addEventListener("click", function() {
+            var doc = window.parent.document;
+            if (!doc.fullscreenElement) {
+                doc.documentElement.requestFullscreen().catch(function(e) {
+                    console.log("Fullscreen error:", e.message);
+                });
+            } else {
+                doc.exitFullscreen();
+            }
         });
     } else {
-        parentDoc.exitFullscreen().then(function() {
-            document.getElementById("fsBtn").innerText = "⛶ Toàn màn hình";
-        });
+        console.log("Không tìm thấy nút fsBtn2");
     }
-});
+}, 500);
 </script>
-""", height=0, width=0)
-
+""", unsafe_allow_html=True)
 
 
 st.markdown('''
