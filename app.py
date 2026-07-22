@@ -862,6 +862,7 @@ Nhiệm vụ:
 3. Đưa ra recommendation phục vụ Founder.
 
 Quy tắc bắt buộc:
+- EXECUTIVE SUMMARY bắt buộc là nhận xét đánh giá đối với gói vay chứ không liên quan gì đến khách hàng. Phải đánh giá gói vay đang được đề xuất không tự động lấy gói vay khác. 
 - Nếu missing_fields không rỗng: recommendation=NEED_MORE_DATA.
 - gross_margin, closing_cash, confidence_score PHẢI lấy đúng giá trị Python cung cấp,
   không tự tính lại.
@@ -871,14 +872,15 @@ Quy tắc bắt buộc:
 - Không phát minh sản phẩm, lãi suất hoặc hạn mức ngoài dữ liệu được cung cấp.
 - three_reasons phải có chính xác 3 phần tử, MỖI phần tử đánh giá đúng 1 trong 3 chỉ số
   bắt buộc theo thứ tự cố định:
-      (1) Lý do về gross_margin — đối chiếu RR-003 (gross_margin < 0.28) nếu bị kích hoạt,
-      nếu không kích hoạt vẫn phải nhận xét gross_margin đang ở mức an toàn hay không (bắt buộc phải so sánh đúng gross margin đang bé hơn hay lớn hơn 0.28). 
-      Nếu gross margin bé hơn 0.28 thì sẽ ảnh hưởng đến khả năng tài chính của OPC phải có đàm phán lại với khách hàng. 
-      (2) Lý do về closing_cash — đối chiếu RR-002 (Projected_Closing_Cash < 550 triệu VND)
-      nếu bị kích hoạt, nếu không kích hoạt vẫn phải nhận xét khả năng thanh khoản (Bắt buộc phải xác định đúng giá trị Closing cash đang bé hơn hay lớn hơn 550tr).
-      (3) Lý do về confidence_score — đối chiếu RR-006 (confidence_score < 0.65, chỉ áp dụng
-      khi RR-002 đã kích hoạt) nếu bị kích hoạt, nếu không kích hoạt (hoặc confidence_score
-      là None) vẫn phải nhận xét mức độ tin cậy dữ liệu.
+      (1) Đánh giá gross margin: lấy gross margin được tính toán ở trên, không được tự nghĩ ra số liệu hay tự ý thay đổi số liệu. 
+          - Nếu gross margin < 0.28: Nội dung bắt buộc sinh ra: "Chỉ số Gross Margin hiện tại là {gross_margin}, bé hơn mức tiêu chuẩn 0.28 (Kích hoạt RR-003). Điều này sẽ ảnh hưởng trực tiếp đến khả năng tài chính của OPC, do đó bắt buộc phải tiến hành đàm phán lại với khách hàng."
+          - Nếu gross margin > 0.28: Nội dung bắt buộc sinh ra: "Chỉ số Gross Margin hiện tại là {gross_margin}, lớn hơn hoặc bằng mức tiêu chuẩn 0.28. Mức biên lợi nhuận này đang ở trạng thái an toàn."
+      (2) Đánh giá closing cash: lấy closing cash được tính toán ở trên, không được tự nghĩ ra số liệu hay tự ý thay đổi số liệu. 
+          - Nếu closing cash < 550 triệu: Nội dung bắt buộc sinh ra: "Projected Closing Cash hiện tại là {closing_cash}, bé hơn mốc an toàn 550 triệu VND (Kích hoạt RR-002). Dự án đang có rủi ro về khả năng thanh khoản."
+          - Nếu closing cash > 550 triệu: Nội dung bắt buộc sinh ra: "Projected Closing Cash hiện tại là {closing_cash}, lớn hơn hoặc bằng mốc 550 triệu VND. Khả năng thanh khoản của dự án được đảm bảo."
+      (3) Đánh giá confidence score: 
+          - Nếu confidence_score < 0.65 :Nội dung bắt buộc sinh ra: "Confidence Score hiện tại là {confidence_score}, bé hơn mức 0.65 (Kích hoạt RR-006 do RR-002 đã cảnh báo). Mức độ tin cậy của dữ liệu dự phóng thấp, cần rà soát lại đầu vào."
+          - Nếu confidence_score > 0.65: "Confidence Score hiện tại là {confidence_score} (Không kích hoạt RR-006). Mức độ tin cậy của dữ liệu ở mức có thể chấp nhận để ra quyết định."
       Mỗi lý do phải nêu rõ số liệu cụ thể (giá trị chỉ số) và rule liên quan nếu có kích hoạt,
       không được viết chung chung hay gộp nhiều chỉ số vào 1 lý do.
 - protection_condition phải là một điều kiện thương mại hoặc kiểm soát cụ thể cần Founder xác nhận.
