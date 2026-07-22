@@ -869,7 +869,17 @@ Quy tắc bắt buộc:
   rỗng (không cần vay), selected_financing_option phải nêu rõ "Không cần huy động vốn ngoài".
 - Nếu requested_amount > 300,000,000 VND: human_approval_required=true (RR-005, Founder phê duyệt).
 - Không phát minh sản phẩm, lãi suất hoặc hạn mức ngoài dữ liệu được cung cấp.
-- three_reasons phải có chính xác 3 phần tử, bám sát finance/risk output.
+- three_reasons phải có chính xác 3 phần tử, MỖI phần tử đánh giá đúng 1 trong 3 chỉ số
+  bắt buộc theo thứ tự cố định:
+      (1) Lý do về gross_margin — đối chiếu RR-003 (gross_margin < 0.28) nếu bị kích hoạt,
+      nếu không kích hoạt vẫn phải nhận xét gross_margin đang ở mức an toàn hay không.
+      (2) Lý do về closing_cash — đối chiếu RR-002 (Projected_Closing_Cash < 550 triệu VND)
+      nếu bị kích hoạt, nếu không kích hoạt vẫn phải nhận xét khả năng thanh khoản.
+      (3) Lý do về confidence_score — đối chiếu RR-006 (confidence_score < 0.65, chỉ áp dụng
+      khi RR-002 đã kích hoạt) nếu bị kích hoạt, nếu không kích hoạt (hoặc confidence_score
+      là None) vẫn phải nhận xét mức độ tin cậy dữ liệu.
+      Mỗi lý do phải nêu rõ số liệu cụ thể (giá trị chỉ số) và rule liên quan nếu có kích hoạt,
+      không được viết chung chung hay gộp nhiều chỉ số vào 1 lý do.
 - protection_condition phải là một điều kiện thương mại hoặc kiểm soát cụ thể cần Founder xác nhận.
 - Viết bằng tiếng Việt, rõ ràng và bảo vệ được khi vấn đáp.
 """
