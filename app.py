@@ -1665,7 +1665,7 @@ with tab_ops:
             st.info("Workflow sẽ xuất hiện sau khi chạy hệ thống.")
         else:
             st.success(
-                f"OpenAI API • Model: {result['model']} • "
+                f"OpenAI API"
                 f"{result['elapsed_seconds']:.1f}s"
             )
 
