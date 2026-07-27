@@ -69,14 +69,6 @@ CASH_RESERVE_THRESHOLD_DEFAULT = 550_000_000.0  # RR-002 fallback nếu thiếu 
 LARGE_DECISION_THRESHOLD = 300_000_000.0  # RR-005 / ngưỡng Founder approval
 DEBT_CHECK_DATE = pd.Timestamp("2026-06-17")  # mốc kiểm tra hóa đơn Open quá hạn (Trường 2)
 
-# Customer engagement = (Điểm lịch sử giao dịch) + (Điểm pricing model)
-#   - Điểm lịch sử giao dịch: >3 giao dịch = 0.5; 1-2 giao dịch = 0.25; 0 giao dịch = 0
-#   - Điểm pricing model: Initial setup = 0.5; Monthly subscription = 0.25; Project = 0.2
-PRICING_MODEL_ENGAGEMENT_SCORE = {
-    PRICING_MODEL_INITIAL_SETUP: 0.5,
-    PRICING_MODEL_MONTHLY_SUBSCRIPTION: 0.25,
-    PRICING_MODEL_PROJECT: 0.2,
-}
 
 
 # ============================================================
