@@ -928,7 +928,7 @@ Quy tắc bắt buộc:
 - Không tự thay đổi, làm tròn lại hoặc phát minh số liệu.
 - Không tự tính lại các chỉ số; dùng đúng finance_metrics/cash_projection được cung cấp.
 - Nếu missing_fields không rỗng, data_quality phải là MISSING_DATA và
-  preliminary_assessment phải là NEED_MORE_DATA. Chỉ kích hoạt khi thiếu dữ liệu đầu vào, nếu không thiếu bắt buộc không được kích hoạt. 
+  preliminary_assessment phải là NEED_MORE_DATA (Chỉ kích hoạt khi thiếu dữ liệu đầu vào, nếu không thiếu bắt buộc không được kích hoạt). 
 - Viết bằng tiếng Việt, ngắn gọn, phục vụ Founder.
 - Chỉ dựa trên payload được cung cấp.
 """
@@ -969,11 +969,10 @@ Nhiệm vụ:
 2. Tạo Decision Card gồm ĐÚNG 3 chỉ số bắt buộc (gross_margin, closing_cash,
    confidence_score), 1 phương án tài chính đề xuất, đúng 3 lý do và đúng 1
    điều kiện bảo vệ cần con người xác nhận.
-3. Đưa ra recommendation phải phù hợp với các chỉ số đã đưa ra, hay phân tích chi tiết trước khi đưa đề xuất .
+3. Đưa ra recommendation đề xuất cho Founder .
 
 Quy tắc bắt buộc:
 - EXECUTIVE SUMMARY bắt buộc là nhận xét đánh giá đối với gói vay chứ không liên quan gì đến khách hàng. Phải đánh giá gói vay đang được đề xuất không tự động lấy gói vay khác. 
-- Nếu missing_fields không rỗng: recommendation=NEED_MORE_DATA.
 - gross_margin, closing_cash, confidence_score PHẢI lấy đúng giá trị Python cung cấp,
   không tự tính lại.
 - Chỉ chọn phương án tài chính có eligible=true trong partner_matrix; nếu partner_matrix
