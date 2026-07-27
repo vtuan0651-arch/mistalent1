@@ -998,9 +998,9 @@ Quy tắc bắt buộc:
 - So sánh đúng requested_amount > 300tr mới cần Founder phê duyệt.
 - Quy tắc khi đưa ra recommendation: 
     + ACCEPT: Chấp nhận hoàn toàn đề xuất (khi các chỉ số tài chính đạt chuẩn, không có rủi ro lớn và dữ liệu đầy đủ).
-    + CONDITIONAL_ACCEPT: Chấp nhận có điều kiện (khi dự án có thể thực hiện nhưng đi kèm các yêu cầu ràng buộc, biện pháp kiểm soát rủi ro hoặc cần đàm phán lại một số điều khoản như biên lợi nhuận). Các chỉ số không quá thấp đối với ngưỡng yêu .
+    + CONDITIONAL_ACCEPT: Chấp nhận có điều kiện (khi dự án có thể thực hiện nhưng đi kèm các yêu cầu ràng buộc, biện pháp kiểm soát rủi ro hoặc cần đàm phán lại một số điều khoản như biên lợi nhuận). Các chỉ số không quá thấp đối với ngưỡng yêu cầu của cái Risk rule.
     + REJECT: Từ chối đề xuất (khi vi phạm các quy tắc rủi ro nghiêm trọng hoặc không đáp ứng các tiêu chuẩn cốt lõi) khi tất cả các chỉ số đều dưới mức yêu cầu của các Risk rule.
-    + NEED_MORE_DATA: Cần bổ sung thêm dữ liệu (được kích hoạt tự động bắt buộc nếu danh sách missing_fields không rỗng).
+    + NEED_MORE_DATA: Cần bổ sung thêm dữ liệu (được kích hoạt tự động bắt buộc nếu danh sách missing_fields không rỗng). Chỉ kích hoạt khi có thông tin đầu vào thiếu. 
 """
     return call_structured_agent(client, model, instructions, payload, DecisionAgentOutput)
 
