@@ -928,7 +928,7 @@ Quy tắc bắt buộc:
 - Không tự thay đổi, làm tròn lại hoặc phát minh số liệu.
 - Không tự tính lại các chỉ số; dùng đúng finance_metrics/cash_projection được cung cấp.
 - Nếu missing_fields không rỗng, data_quality phải là MISSING_DATA và
-  preliminary_assessment phải là NEED_MORE_DATA.
+  preliminary_assessment phải là NEED_MORE_DATA. Chỉ kích hoạt khi thiếu dữ liệu đầu vào, nếu không thiếu bắt buộc không được kích hoạt. 
 - Viết bằng tiếng Việt, ngắn gọn, phục vụ Founder.
 - Chỉ dựa trên payload được cung cấp.
 """
@@ -1000,7 +1000,7 @@ Quy tắc bắt buộc:
     + ACCEPT: Chấp nhận hoàn toàn đề xuất (khi các chỉ số tài chính đạt chuẩn, không có rủi ro lớn và dữ liệu đầy đủ).
     + CONDITIONAL_ACCEPT: Chấp nhận có điều kiện (khi dự án có thể thực hiện nhưng đi kèm các yêu cầu ràng buộc, biện pháp kiểm soát rủi ro hoặc cần đàm phán lại một số điều khoản như biên lợi nhuận). Các chỉ số không quá thấp đối với ngưỡng yêu cầu của cái Risk rule.
     + REJECT: Từ chối đề xuất (khi vi phạm các quy tắc rủi ro nghiêm trọng hoặc không đáp ứng các tiêu chuẩn cốt lõi) khi tất cả các chỉ số đều dưới mức yêu cầu của các Risk rule.
-    + NEED_MORE_DATA: Cần bổ sung thêm dữ liệu (được kích hoạt tự động bắt buộc nếu danh sách missing_fields không rỗng). Chỉ kích hoạt khi có thông tin đầu vào thiếu. 
+    + NEED_MORE_DATA: Chỉ kích hoạt khi có thông tin đầu vào thiếu. Còn lại không được phép kích hoạt. 
 """
     return call_structured_agent(client, model, instructions, payload, DecisionAgentOutput)
 
