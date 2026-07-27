@@ -996,6 +996,11 @@ Quy tắc bắt buộc:
 - protection_condition phải là một điều kiện thương mại hoặc kiểm soát cụ thể cần Founder xác nhận.
 - Viết bằng tiếng Việt, rõ ràng và bảo vệ được khi vấn đáp.
 - So sánh đúng requested_amount > 300tr mới cần Founder phê duyệt.
+- Quy tắc khi đưa ra recommendation: 
+    + ACCEPT: Chấp nhận hoàn toàn đề xuất (khi các chỉ số tài chính đạt chuẩn, không có rủi ro lớn và dữ liệu đầy đủ).
+    + CONDITIONAL_ACCEPT: Chấp nhận có điều kiện (khi dự án có thể thực hiện nhưng đi kèm các yêu cầu ràng buộc, biện pháp kiểm soát rủi ro hoặc cần đàm phán lại một số điều khoản như biên lợi nhuận). Các chỉ số không quá thấp đối với ngưỡng yêu .
+    + REJECT: Từ chối đề xuất (khi vi phạm các quy tắc rủi ro nghiêm trọng hoặc không đáp ứng các tiêu chuẩn cốt lõi) khi tất cả các chỉ số đều dưới mức yêu cầu của các Risk rule.
+    + NEED_MORE_DATA: Cần bổ sung thêm dữ liệu (được kích hoạt tự động bắt buộc nếu danh sách missing_fields không rỗng).
 """
     return call_structured_agent(client, model, instructions, payload, DecisionAgentOutput)
 
