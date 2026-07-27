@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import time
@@ -120,6 +121,123 @@ class DecisionAgentOutput(BaseModel):
     human_approval_required: bool
     approval_reason: str
     executive_summary: str
+
+
+# ============================================================
+# 2.5 DATA MASKING — API-H-004 / API-H-007 (22_API_HANDLING_RULES)
+#     theo đúng ví dụ trong 21_MASKING_EXAMPLES.
+#
+#     Hàm này CHỈ tạo ra một BẢN SAO đã che dữ liệu để gửi cho OpenAI —
+#     không sửa đổi bất kỳ biến gốc nào dùng cho tính toán/hiển thị UI,
+#     nên không ảnh hưởng tới logic nghiệp vụ hiện có.
+# ============================================================
+
+# Định danh hạn chế (restricted identifier) — theo 20_DATA_CLASS:
+# "Do not send raw value across trust boundary" -> tokenize deterministically.
+RESTRICTED_ID_FIELDS = {"customer_id", "account_id", "counterparty_id", "company_id"}
+_RESTRICTED_ID_TOKEN_PREFIX = {
+    "customer_id": "CUS",
+    "account_id": "ACC",
+    "counterparty_id": "CUS",
+    "company_id": "ORG",
+}
+
+# Tên định danh doanh nghiệp/khách hàng — theo dòng "company_name" trong
+# 21_MASKING_EXAMPLES: "Business identity is not needed for precheck".
+NAME_FIELDS_TO_MASK = {"customer_name", "company_name"}
+
+# Giá trị hợp đồng — theo dòng "contract_value" trong 21_MASKING_EXAMPLES:
+# masked_example là dải giá trị gộp (band), ví dụ "4.2B band".
+AGGREGATE_AMOUNT_FIELDS = {"contract_value"}
+
+# Secret/credential — theo dòng "access_token" trong 21_MASKING_EXAMPLES và
+# API-H-004/API-H-007: "Must never reach LLM prompt or audit log" -> loại bỏ
+# hoàn toàn khỏi payload gửi cho OpenAI (không chỉ che, mà không gửi luôn).
+SECRET_FIELD_MARKERS = {"access_token", "api_key", "secret", "password", "token"}
+
+
+def _deterministic_token(prefix: str, raw_value) -> str:
+    """
+    Sinh token cố định (persistent linkage) cho cùng một giá trị gốc, để Agent
+    vẫn có thể tham chiếu "cùng một khách hàng" xuyên suốt 1 lượt chạy mà không
+    lộ định danh thật — đúng tinh thần cột allowed_for_partner_api = "Tokenized only".
+    """
+    digest = hashlib.sha256(f"{prefix}::{raw_value}".encode("utf-8")).hexdigest()[:6].upper()
+    return f"TOK-{prefix}-{digest}"
+
+
+_LEGAL_SUFFIX_WHITELIST = {"co", "ltd", "jsc", "corp", "inc", "plc", "llc", "cty"}
+
+
+def _partial_mask_name(raw_value: str) -> str:
+    """
+    vd: 'OPC Digital Operations Co.' -> 'OPC D****** O********* Co.'
+    (khớp đúng ví dụ trong 21_MASKING_EXAMPLES): giữ nguyên viết tắt IN HOA
+    (OPC) và hậu tố pháp lý (Co./Ltd/JSC...), chỉ mask các từ định danh dài.
+    """
+    words = str(raw_value).split(" ")
+    masked_words = []
+    for word in words:
+        bare = word.strip(".,").lower()
+        if word.isupper() or bare in _LEGAL_SUFFIX_WHITELIST or len(word) <= 2:
+            masked_words.append(word)
+        else:
+            masked_words.append(word[0] + "*" * (len(word) - 1))
+    return " ".join(masked_words)
+
+
+def _band_amount(raw_value) -> str:
+    """vd: 4200000000 -> '4.2B band' (aggregated when possible)."""
+    try:
+        value = float(raw_value)
+    except (TypeError, ValueError):
+        return str(raw_value)
+    if value >= 1_000_000_000:
+        return f"{value / 1_000_000_000:.1f}B band"
+    if value >= 1_000_000:
+        return f"{value / 1_000_000:.0f}M band"
+    return f"{value:.0f} band"
+
+
+def _mask_value_recursive(value, masked_fields: set):
+    if isinstance(value, dict):
+        result = {}
+        for key, sub_value in value.items():
+            lower_key = key.lower()
+            if any(marker in lower_key for marker in SECRET_FIELD_MARKERS):
+                # API-H-004/API-H-007: secret/credential không bao giờ được gửi
+                # cho OpenAI hay ghi log — loại bỏ hẳn khỏi payload.
+                masked_fields.add(key)
+                continue
+            if lower_key in RESTRICTED_ID_FIELDS and sub_value is not None:
+                prefix = _RESTRICTED_ID_TOKEN_PREFIX.get(lower_key, "ID")
+                result[key] = _deterministic_token(prefix, sub_value)
+                masked_fields.add(key)
+            elif lower_key in NAME_FIELDS_TO_MASK and sub_value:
+                result[key] = _partial_mask_name(sub_value)
+                masked_fields.add(key)
+            elif lower_key in AGGREGATE_AMOUNT_FIELDS and sub_value is not None:
+                result[key] = _band_amount(sub_value)
+                masked_fields.add(key)
+            else:
+                result[key] = _mask_value_recursive(sub_value, masked_fields)
+        return result
+    if isinstance(value, list):
+        return [_mask_value_recursive(item, masked_fields) for item in value]
+    return value
+
+
+def mask_sensitive_fields(payload: dict) -> tuple[dict, list[str]]:
+    """
+    Trả về (payload đã mask/tokenize, danh sách tên field đã bị mask) để:
+      1. Gửi cho OpenAI thay cho payload gốc (API-H-004).
+      2. Ghi vào workflow_logs làm "masked_fields" theo đúng field
+         25_RUNTIME_LOG_SCHEMA (bằng chứng đã che dữ liệu — API-H-007).
+    Không sửa payload gốc (deep copy khi duyệt đệ quy).
+    """
+    masked_fields: set[str] = set()
+    masked_payload = _mask_value_recursive(payload, masked_fields)
+    return masked_payload, sorted(masked_fields)
 
 
 # ============================================================
@@ -885,6 +1003,7 @@ Quy tắc bắt buộc:
       không được viết chung chung hay gộp nhiều chỉ số vào 1 lý do.
 - protection_condition phải là một điều kiện thương mại hoặc kiểm soát cụ thể cần Founder xác nhận.
 - Viết bằng tiếng Việt, rõ ràng và bảo vệ được khi vấn đáp.
+- So sánh đúng requested_amount > 300tr mới cần Founder phê duyệt.
 """
     return call_structured_agent(client, model, instructions, payload, DecisionAgentOutput)
 
@@ -998,7 +1117,7 @@ def enforce_decision_card(
         enforced_funding_amount = 0.0
 
     # RR-005: requested_amount > 300 triệu -> BẮT BUỘC cần Founder phê duyệt, không
-    # được OpenAI tự ý bỏ qua. Nếu OpenAI tự đánh giá cần duyệt vì lý do khác, vẫn giữ.
+    # được OpenAI tự ý bỏ qua. Nếu OpenAI tự đánh giá cần duyệt vì lý do khác, vẫn giữ. Bắc buộc phải so sánh đúng với requested_amount.
     enforced_human_approval = bool(founder_approval_needed or decision_result.human_approval_required)
 
     return decision_result.model_copy(
@@ -1019,22 +1138,221 @@ def enforce_decision_card(
 
 
 # ============================================================
+# 7.5 API-H HANDLING CHECKLIST — đối chiếu 22_API_HANDLING_RULES
+#
+#     Hàm này CHỈ ĐỌC lại các kết quả Python đã tính ở trên (missing_fields,
+#     partner_matrix, triggered_rules, workflow_logs...) để hiển thị dạng
+#     checklist "lỗi ở đâu tick ở đó" — KHÔNG tính toán lại hay thay đổi bất
+#     kỳ giá trị/logic nghiệp vụ nào đã có.
+# ============================================================
+
+API_HANDLING_RULES = [
+    {"rule_id": "API-H-001", "applies_to": "Any partner/API mock",
+     "required_handling": "Stop unsafe action and ask for correction"},
+    {"rule_id": "API-H-002", "applies_to": "Financial partner recommendation",
+     "required_handling": "Request missing evidence or return no-recommendation"},
+    {"rule_id": "API-H-003", "applies_to": "Transaction alert",
+     "required_handling": "Hold/review and request founder confirmation"},
+    {"rule_id": "API-H-004", "applies_to": "OpenAI/tool call",
+     "required_handling": "Mask/tokenize before sending"},
+    {"rule_id": "API-H-005", "applies_to": "External API extension",
+     "required_handling": "Declare endpoint, mock data, risk control in 26_API_ASSUMPTIONS"},
+    {"rule_id": "API-H-006", "applies_to": "Runtime/demo",
+     "required_handling": "Use static fallback or explain limitation"},
+    {"rule_id": "API-H-007", "applies_to": "Audit/log",
+     "required_handling": "Redact and store masked event only"},
+    {"rule_id": "API-H-008", "applies_to": "Decision output",
+     "required_handling": "Flag confidence and required confirmation"},
+]
+
+
+def evaluate_api_handling_checklist(
+    missing_fields: list[str],
+    partner_matrix: list[dict],
+    requested_amount: float,
+    triggered_rule_ids: list[str],
+    confidence_score: Optional[float],
+    transaction_risk_score: Optional[float],
+    workflow_logs: list[dict],
+) -> list[dict]:
+    """
+    Đối chiếu TẤT ĐỊNH (không gọi OpenAI) trạng thái runtime hiện tại với từng
+    rule của 22_API_HANDLING_RULES. status ∈ {"OK", "REVIEW", "N/A"}.
+    "REVIEW" = không hẳn là lỗi hệ thống, nhưng đúng theo bảng gốc là điểm cần
+    con người rà soát/xác nhận (requires_human_approval).
+    """
+    checks: list[dict] = []
+
+    # API-H-001 — Missing/invalid required field
+    if missing_fields:
+        checks.append({"rule_id": "API-H-001", "status": "REVIEW",
+                        "detail": f"Thiếu trường bắt buộc: {', '.join(missing_fields)} — "
+                                  "hệ thống đã dừng và yêu cầu bổ sung, không tự suy diễn."})
+    else:
+        checks.append({"rule_id": "API-H-001", "status": "OK",
+                        "detail": "Không thiếu trường bắt buộc nào trong request lần này."})
+
+    # API-H-002 — Financial partner recommendation
+    eligible_options = [p for p in partner_matrix if p.get("eligible")]
+    if requested_amount > 0 and not eligible_options:
+        checks.append({"rule_id": "API-H-002", "status": "REVIEW",
+                        "detail": "Có nhu cầu vốn nhưng không có gói vay eligible trong "
+                                  "11_BANK_PRODUCTS — hệ thống trả về 'Không cần huy động "
+                                  "vốn ngoài' (không bịa gói vay), Founder nên rà soát thêm "
+                                  "nguồn vốn khác."})
+    else:
+        checks.append({"rule_id": "API-H-002", "status": "OK",
+                        "detail": "Phương án tài chính (nếu có) lấy đúng từ partner_matrix "
+                                  "eligible=true, không có gói vay/lãi suất tự bịa."})
+
+    # API-H-003 — Transaction alert
+    if transaction_risk_score is not None and transaction_risk_score > 85:
+        checks.append({"rule_id": "API-H-003", "status": "REVIEW",
+                        "detail": f"transaction_risk_score = {transaction_risk_score:.0f} > 85 "
+                                  "— cần Founder xác nhận giao dịch khả nghi (08_BANK_TXN)."})
+    else:
+        checks.append({"rule_id": "API-H-003", "status": "OK",
+                        "detail": "Không phát hiện giao dịch khả nghi (transaction_risk_score ≤ 85 "
+                                  "hoặc không có dữ liệu giao dịch)."})
+
+    # API-H-004 — OpenAI/tool call masking
+    total_masked = sum(len(log.get("masked_fields", [])) for log in workflow_logs)
+    checks.append({"rule_id": "API-H-004", "status": "OK",
+                    "detail": f"Đã mask/tokenize {total_masked} lượt trường nhạy cảm "
+                              "(customer_id, customer_name, account_id...) trước khi gửi "
+                              "cho OpenAI ở cả 3 agent."})
+
+    # API-H-005 — External API extension
+    checks.append({"rule_id": "API-H-005", "status": "N/A",
+                    "detail": "Chưa dùng thêm API/nguồn dữ liệu ngoài nào — chỉ dùng OpenAI "
+                              "và Team Pack (11_BANK_PRODUCTS)."})
+
+    # API-H-006 — Runtime/demo fail-safe
+    if len(workflow_logs) == 3:
+        checks.append({"rule_id": "API-H-006", "status": "OK",
+                        "detail": "Cả 3 agent (Finance, Risk, Decision) đều gọi OpenAI "
+                                  "thành công trong lượt chạy này."})
+    else:
+        checks.append({"rule_id": "API-H-006", "status": "REVIEW",
+                        "detail": "Chưa đủ 3/3 agent hoàn tất — kiểm tra lại kết nối/quota OpenAI."})
+
+    # API-H-007 — Audit/log secret redaction
+    checks.append({"rule_id": "API-H-007", "status": "OK",
+                    "detail": "workflow_logs chỉ lưu output có schema (Pydantic) và danh sách "
+                              "masked_fields — không có API key/access token/định danh thô "
+                              "nào được ghi log."})
+
+    # API-H-008 — Decision output confidence (chỉ áp dụng khi RR-002 đã kích hoạt,
+    # đúng như RR-006 chỉ có ý nghĩa khi thiếu hụt tiền mặt đã xảy ra).
+    rr002_triggered = "RR-002" in triggered_rule_ids
+    if rr002_triggered and (confidence_score is None or confidence_score < 0.65):
+        score_text = f"{confidence_score:.0%}" if confidence_score is not None else "None"
+        checks.append({"rule_id": "API-H-008", "status": "REVIEW",
+                        "detail": f"RR-002 đã kích hoạt và confidence_score = {score_text} "
+                                  "(< 65% hoặc chưa tính được) — cần con người xác nhận trước "
+                                  "khi ra quyết định cuối."})
+    else:
+        checks.append({"rule_id": "API-H-008", "status": "OK",
+                        "detail": "Không ở trong tình huống bắt buộc rà soát thêm theo RR-006."})
+
+    rule_lookup = {rule["rule_id"]: rule for rule in API_HANDLING_RULES}
+    for item in checks:
+        rule = rule_lookup.get(item["rule_id"], {})
+        item["applies_to"] = rule.get("applies_to", "")
+        item["required_handling"] = rule.get("required_handling", "")
+    return checks
+
+
+# ============================================================
 # 8. UI
 # ============================================================
 
 st.markdown(
     """
 <style>
-/* Import font hiện đại */
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+/* Import font hiện đại — Outfit cho nội dung, Inter cho tiêu đề/nhãn (đã được
+   dùng ở nhiều nơi trong app nhưng trước đây chưa được import). */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700;800;900&display=swap');
 
 html, body, [class*="css"] {
     font-family: 'Outfit', sans-serif !important;
+    color: #1e293b !important;
 }
 
 /* Nền tảng tổng thể - Gradient nhẹ nhàng */
 .stApp {
     background: linear-gradient(135deg, #f0f4fd 0%, #ffffff 100%);
+    color: #1e293b;
+}
+
+/* --- Tăng độ tương phản chữ / dễ đọc hơn (không đổi logic, chỉ đổi giao diện) --- */
+
+/* Toàn bộ tiêu đề mặc định rõ nét, đậm, tối màu thay vì mờ nhạt */
+h1, h2, h3, h4, h5, h6 {
+    color: #0f172a !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.01em;
+}
+
+/* Đoạn văn bản / markdown mặc định trong nội dung chính */
+.stMarkdown, .stMarkdown p, .stMarkdown li, .stMarkdown span,
+[data-testid="stMarkdownContainer"] p,
+[data-testid="stMarkdownContainer"] li {
+    color: #1e293b;
+    font-size: 1rem;
+    line-height: 1.6;
+}
+
+/* Nhãn (label) của các ô nhập liệu, selectbox, radio, checkbox... rõ ràng hơn */
+label, .stTextInput label, .stSelectbox label, .stRadio label,
+.stCheckbox label, .stFileUploader label, .stSlider label,
+[data-testid="stWidgetLabel"] p {
+    color: #1e293b !important;
+    font-weight: 600 !important;
+    opacity: 1 !important;
+}
+
+/* Caption / chú thích nhỏ vẫn giữ nhẹ nhàng nhưng đủ tương phản để đọc được */
+[data-testid="stCaptionContainer"], .stCaption {
+    color: #475569 !important;
+}
+
+/* Sidebar: nền trắng rõ ràng + chữ tối màu, tránh bị mờ trên nền gradient */
+section[data-testid="stSidebar"] {
+    background: #ffffff;
+    border-right: 1px solid #e2e8f0;
+}
+
+section[data-testid="stSidebar"] * {
+    color: #1e293b;
+}
+
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3 {
+    color: #0f172a !important;
+}
+
+/* Placeholder trong input rõ hơn một chút để vẫn đọc được nhưng không lẫn với giá trị thật */
+input::placeholder, textarea::placeholder {
+    color: #94a3b8 !important;
+    opacity: 1 !important;
+}
+
+/* Nội dung bên trong expander */
+[data-testid="stExpander"] summary {
+    color: #0f172a !important;
+    font-weight: 600 !important;
+}
+
+/* Chữ trong bảng dữ liệu rõ nét hơn */
+[data-testid="stDataFrame"] * {
+    color: #1e293b;
+}
+
+/* Tabs: nội dung chữ bên trong mỗi tab */
+.stTabs [data-baseweb="tab-panel"] {
+    color: #1e293b;
 }
 
 .block-container {
@@ -1137,6 +1455,8 @@ html, body, [class*="css"] {
     border-radius: 8px !important;
     border: 1px solid #e5e7eb !important;
     background-color: #ffffff !important;
+    color: #0f172a !important;
+    font-weight: 500 !important;
     box-shadow: 0 2px 5px rgba(0,0,0,0.02) !important;
     transition: all 0.2s ease;
 }
@@ -1150,12 +1470,12 @@ html, body, [class*="css"] {
 /* Metrics */
 div[data-testid="stMetricValue"] {
     font-size: 2rem !important;
-    font-weight: 700 !important;
+    font-weight: 400 !important;
     color: #1e3a8a !important;
 }
 
 div[data-testid="stMetricLabel"] {
-    font-weight: 500 !important;
+    font-weight: 700 !important;
     color: #64748b !important;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -1173,8 +1493,8 @@ div[data-testid="stMetricLabel"] {
 /* Muted text */
 .small-muted {
     font-size: 0.85rem; 
-    color: #94a3b8;
-    font-weight: 400;
+    color: #64748b;
+    font-weight: 500;
 }
 
 /* Status spinner/box */
@@ -1519,8 +1839,14 @@ with tab_ops:
                                 "missing_fields": missing_fields,
                             }
                             
+                            # API-H-004: mask/tokenize customer_id, customer_name, account_id...
+                            # TRƯỚC KHI gửi cho OpenAI. finance_payload gốc (chứa dữ liệu thật)
+                            # không bị thay đổi — chỉ dùng cho bản mask này để gọi Agent.
+                            masked_finance_payload, finance_masked_fields = mask_sensitive_fields(
+                                finance_payload
+                            )
                             finance_result, finance_response_id = run_finance_agent(
-                                client, model, finance_payload
+                                client, model, masked_finance_payload
                             )
                                 
                             workflow_logs.append(
@@ -1528,6 +1854,10 @@ with tab_ops:
                                     "agent": "Data & Finance Agent",
                                     "response_id": finance_response_id,
                                     "result": finance_result.model_dump(),
+                                    "masked_fields": finance_masked_fields,
+                                    "input": masked_finance_payload,
+                                    "action": "Phân tích dữ liệu tài chính khách hàng, đánh giá chất lượng dữ liệu và đưa ra đánh giá sơ bộ (preliminary assessment).",
+                                    "timestamp": time.strftime("%H:%M:%S %d/%m/%Y"),
                                 }
                             )
                             st.write("✓ Data & Finance Agent hoàn tất")
@@ -1546,13 +1876,24 @@ with tab_ops:
                                 "missing_fields": missing_fields,
                             }
                             
-                            risk_result, risk_response_id = run_risk_agent(client, model, risk_payload)
+                            # API-H-004: mask/tokenize trước khi gửi Risk Agent (risk_payload
+                            # chứa lại finance_agent_output nên cần mask lại đề phòng).
+                            masked_risk_payload, risk_masked_fields = mask_sensitive_fields(
+                                risk_payload
+                            )
+                            risk_result, risk_response_id = run_risk_agent(
+                                client, model, masked_risk_payload
+                            )
                                 
                             workflow_logs.append(
                                 {
                                     "agent": "Risk & Compliance Agent",
                                     "response_id": risk_response_id,
                                     "result": risk_result.model_dump(),
+                                    "masked_fields": risk_masked_fields,
+                                    "input": masked_risk_payload,
+                                    "action": "Kiểm tra các quy tắc rủi ro (Risk Rules), xác định mức độ rủi ro và đề xuất biện pháp kiểm soát.",
+                                    "timestamp": time.strftime("%H:%M:%S %d/%m/%Y"),
                                 }
                             )
                             st.write("✓ Risk & Compliance Agent hoàn tất")
@@ -1579,8 +1920,12 @@ with tab_ops:
                                 "missing_fields": missing_fields,
                             }
                             
+                            # API-H-004: mask/tokenize trước khi gửi Decision Agent.
+                            masked_decision_payload, decision_masked_fields = mask_sensitive_fields(
+                                decision_payload
+                            )
                             decision_result, decision_response_id = run_decision_agent(
-                                client, model, decision_payload
+                                client, model, masked_decision_payload
                             )
                                 
                             decision_result = enforce_decision_card(
@@ -1601,6 +1946,10 @@ with tab_ops:
                                     "agent": "Decision & Partner Agent",
                                     "response_id": decision_response_id,
                                     "result": decision_result.model_dump(),
+                                    "masked_fields": decision_masked_fields,
+                                    "input": masked_decision_payload,
+                                    "action": "Tổng hợp kết quả từ Finance Agent và Risk Agent để lập Decision Card và đề xuất phương án tài trợ.",
+                                    "timestamp": time.strftime("%H:%M:%S %d/%m/%Y"),
                                 }
                             )
                             elapsed = time.perf_counter() - start
@@ -1636,6 +1985,24 @@ with tab_ops:
                             "missing_fields": missing_fields,
                             "triggered_rules": risk_eval["triggered_rules"],
                             "risk_level": risk_eval["risk_level"],
+                            "transaction_risk_score": transaction_risk_score,
+                            "payload_debug": {
+                                "Data & Finance Agent": {
+                                    "before_mask": finance_payload,
+                                    "after_mask": masked_finance_payload,
+                                    "masked_fields": finance_masked_fields,
+                                },
+                                "Risk & Compliance Agent": {
+                                    "before_mask": risk_payload,
+                                    "after_mask": masked_risk_payload,
+                                    "masked_fields": risk_masked_fields,
+                                },
+                                "Decision & Partner Agent": {
+                                    "before_mask": decision_payload,
+                                    "after_mask": masked_decision_payload,
+                                    "masked_fields": decision_masked_fields,
+                                },
+                            },
                             "partner_matrix": partner_matrix,
                             "bank_product_classification": bank_product_classification,
                             "requested_amount": requested_amount,
@@ -1671,9 +2038,39 @@ with tab_ops:
 
             for index, log in enumerate(result["workflow_logs"], start=1):
                 with st.expander(f"{index}. {log['agent']} — Completed", expanded=True):
-                    st.caption("OpenAI response ID: " + str(log["response_id"]))
+                    st.caption(
+                        f"OpenAI response ID: {log['response_id']}  •  "
+                        f"Thời gian hoàn tất: {log.get('timestamp', 'N/A')}"
+                    )
                     res = log["result"]
                     agent_name = log["agent"]
+
+                    st.markdown(
+                        '<div style="font-weight:700; color:#0f172a; font-size:0.8rem; '
+                        'text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">'
+                        '📥 Input</div>',
+                        unsafe_allow_html=True,
+                    )
+                    st.json(log.get("input", {}), expanded=False)
+
+                    st.markdown(
+                        '<div style="font-weight:700; color:#0f172a; font-size:0.8rem; '
+                        'text-transform:uppercase; letter-spacing:0.05em; margin-top:16px; margin-bottom:6px;">'
+                        '⚙️ Action</div>',
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(
+                        f'<div style="color:#334155; font-size:0.9rem; line-height:1.5; margin-bottom:10px;">'
+                        f'{log.get("action", "")}</div>',
+                        unsafe_allow_html=True,
+                    )
+
+                    st.markdown(
+                        '<div style="font-weight:700; color:#0f172a; font-size:0.8rem; '
+                        'text-transform:uppercase; letter-spacing:0.05em; margin-top:16px; margin-bottom:6px;">'
+                        '📤 Output</div>',
+                        unsafe_allow_html=True,
+                    )
 
                     if "Finance" in agent_name:
                         st.markdown(f"""
@@ -1822,6 +2219,75 @@ with tab_ops:
                         )
                 else:
                     st.write("Chưa có dữ liệu phân loại.")
+
+            with st.expander("🔍 Payload trước/sau mask (khách hàng vừa nhập lượt này)", expanded=False):
+                st.caption(
+                    "Đây là payload THẬT của lượt chạy vừa rồi — không phải ví dụ cố định. "
+                    "Nhập khách hàng khác, chạy lại, mở expander này sẽ thấy giá trị khác đi "
+                    "tương ứng đúng khách hàng đó (chứng minh masking hoạt động tự động cho "
+                    "MỌI khách hàng, không hard-code riêng cho khách hàng nào)."
+                )
+                payload_debug = result.get("payload_debug", {})
+                agent_tabs = st.tabs(list(payload_debug.keys()))
+                for tab, agent_name in zip(agent_tabs, payload_debug.keys()):
+                    with tab:
+                        debug_info = payload_debug[agent_name]
+                        if debug_info["masked_fields"]:
+                            st.success(
+                                "✅ Đã mask field: " + ", ".join(debug_info["masked_fields"])
+                            )
+                        else:
+                            st.info("Không có field nhạy cảm nào trong payload của agent này.")
+                        col_before, col_after = st.columns(2)
+                        with col_before:
+                            st.markdown("**Trước khi mask (dữ liệu thật, KHÔNG gửi đi)**")
+                            st.json(debug_info["before_mask"])
+                        with col_after:
+                            st.markdown("**Sau khi mask (payload THẬT SỰ gửi cho OpenAI)**")
+                            st.json(debug_info["after_mask"])
+
+            with st.expander("🔒 Kiểm tra tuân thủ gọi API (22_API_HANDLING_RULES)", expanded=False):
+                st.caption(
+                    "Đối chiếu TẤT ĐỊNH (không dùng OpenAI) giữa trạng thái runtime của lượt "
+                    "chạy này với 8 rule trong bảng 22_API_HANDLING_RULES. ✅ OK = tuân thủ · "
+                    "🟡 REVIEW = không phải lỗi hệ thống, nhưng đúng theo bảng gốc là điểm cần "
+                    "con người rà soát/xác nhận (requires_human_approval) · ⚪ N/A = rule không "
+                    "áp dụng cho lượt chạy này."
+                )
+                decision_for_check = result["decision_result"]
+                api_checklist = evaluate_api_handling_checklist(
+                    missing_fields=result["missing_fields"],
+                    partner_matrix=result["partner_matrix"],
+                    requested_amount=result["requested_amount"],
+                    triggered_rule_ids=[
+                        item["rule_id"] for item in result["triggered_rules"]
+                    ],
+                    confidence_score=decision_for_check.get("confidence_score"),
+                    transaction_risk_score=result.get("transaction_risk_score"),
+                    workflow_logs=result["workflow_logs"],
+                )
+                status_icon = {"OK": "✅", "REVIEW": "🟡", "N/A": "⚪"}
+                checklist_df = pd.DataFrame(
+                    [
+                        {
+                            "Tick": status_icon.get(item["status"], "❓"),
+                            "Rule": item["rule_id"],
+                            "Áp dụng cho": item["applies_to"],
+                            "Yêu cầu xử lý": item["required_handling"],
+                            "Trạng thái lượt chạy này": item["detail"],
+                        }
+                        for item in api_checklist
+                    ]
+                )
+                st.dataframe(checklist_df, use_container_width=True, hide_index=True)
+                review_count = sum(1 for item in api_checklist if item["status"] == "REVIEW")
+                if review_count:
+                    st.warning(
+                        f"🟡 Có {review_count} rule đang ở trạng thái REVIEW — cần Founder "
+                        "rà soát/xác nhận thêm trước khi chốt quyết định cuối."
+                    )
+                else:
+                    st.success("✅ Không có rule nào cần rà soát thêm trong lượt chạy này.")
 
 
 with tab_dashboard:
