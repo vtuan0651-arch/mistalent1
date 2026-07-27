@@ -969,7 +969,7 @@ Nhiệm vụ:
 2. Tạo Decision Card gồm ĐÚNG 3 chỉ số bắt buộc (gross_margin, closing_cash,
    confidence_score), 1 phương án tài chính đề xuất, đúng 3 lý do và đúng 1
    điều kiện bảo vệ cần con người xác nhận.
-3. Đưa ra recommendation phải phù hợp với bối cảnh, số liệu để phục vụ Founder.
+3. Đưa ra recommendation phải phù hợp với các chỉ số đã đứa ra, hay phân tích chi tiết trước khi đưa đề .
 
 Quy tắc bắt buộc:
 - EXECUTIVE SUMMARY bắt buộc là nhận xét đánh giá đối với gói vay chứ không liên quan gì đến khách hàng. Phải đánh giá gói vay đang được đề xuất không tự động lấy gói vay khác. 
