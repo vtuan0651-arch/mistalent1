@@ -33,7 +33,7 @@ st.set_page_config(
 # CẢNH BÁO: nếu dán key thật vào đây, không chia sẻ/commit file này lên
 # nơi công khai (GitHub public, v.v.).
 # ------------------------------------------------------------------
-OPENAI_API_KEY_HARDCODED = ""  # <-- dán OpenAI API key của bạn vào đây nếu muốn
+OPENAI_API_KEY_HARDCODED = ""  
 
 REQUIRED_SHEETS = [
     "02_OPC_PROFILE",
@@ -341,18 +341,44 @@ def latest_transaction_risk_score(bank_txn: pd.DataFrame, customer_id: Optional[
     return float(rows.iloc[-1]["transaction_risk_score"])
 
 
+def compute_scale_coefficient(num_provinces: Optional[int]) -> tuple[float, Optional[dict]]:
+    """Hệ số Oper theo quy mô triển khai (số tỉnh/thành phố), nhập thủ công ở Input Data:
+
+    * < 10 tỉnh thành: +0.01
+    * 10 đến 20 tỉnh thành: +0.02
+    * > 20 tỉnh thành: +0.04
+    """
+    if num_provinces is None or num_provinces <= 0:
+        return 0.0, None
+
+    if num_provinces < 10:
+        he_so = 0.01
+        mo_ta = f"< 10 tỉnh thành ({num_provinces})"
+    elif num_provinces <= 20:
+        he_so = 0.02
+        mo_ta = f"10-20 tỉnh thành ({num_provinces})"
+    else:
+        he_so = 0.04
+        mo_ta = f"> 20 tỉnh thành ({num_provinces})"
+
+    return he_so, {"tieu_chi": f"Quy mô triển khai ({mo_ta})", "he_so": he_so}
+
+
 def compute_oper_coefficient(
     payment_reliability: Optional[float],
     province: Optional[str],
     transaction_risk_score: Optional[float],
     order_date: pd.Timestamp,
     due_date: pd.Timestamp,
+    num_provinces: Optional[int] = None,
 ) -> tuple[float, list[dict]]:
     """Cộng dồn hệ số Oper theo bảng điều kiện của System Prompt.
 
     Ghi chú: Uy tín thanh toán (Payment Reliability) và Áp lực tiến độ giao hàng
     (Urgent Delivery) đã được thay thế bằng một hệ số rủi ro con người CỐ ĐỊNH
     +4.0%, luôn được cộng vào Oper bất kể payment_reliability / thời hạn hợp đồng.
+
+    num_provinces: quy mô triển khai dự án (số tỉnh thành), nhập thủ công ở Input Data.
     """
     oper = 0.0
     breakdown = []
@@ -369,6 +395,11 @@ def compute_oper_coefficient(
         oper += 0.04
         breakdown.append({"tieu_chi": "Rủi ro giao dịch > 85", "he_so": 0.04})
 
+    scale_he_so, scale_breakdown_item = compute_scale_coefficient(num_provinces)
+    if scale_breakdown_item is not None:
+        oper += scale_he_so
+        breakdown.append(scale_breakdown_item)
+
     return oper, breakdown
 
 
@@ -379,11 +410,15 @@ def build_finance_metrics(
     transaction_risk_score: Optional[float],
     order_date: pd.Timestamp,
     due_date: pd.Timestamp,
+    num_provinces: Optional[int] = None,
 ) -> dict:
     """
     baseline_estimate = Σ (list_price × (1 - target_margin))
     estimated_cost   = baseline_estimate × (1 + Oper)
     Gross_Margin     = (Σ list_price - estimated_cost) / Σ list_price
+
+    num_provinces: quy mô triển khai dự án (số tỉnh thành), nhập thủ công trên UI —
+    được cộng thêm vào hệ số Oper theo compute_scale_coefficient().
     """
     total_list_price = float(selected_products["list_price"].sum())
     baseline_estimate = float(
@@ -391,7 +426,7 @@ def build_finance_metrics(
     )
 
     oper, oper_breakdown = compute_oper_coefficient(
-        payment_reliability, province, transaction_risk_score, order_date, due_date
+        payment_reliability, province, transaction_risk_score, order_date, due_date, num_provinces
     )
 
     estimated_cost = baseline_estimate * (1 + oper)
@@ -1694,6 +1729,15 @@ with tab_ops:
                 province_default = existing_customer.get("province") if existing_customer else ""
                 province = st.text_input("Tỉnh/thành phố (province)", value=province_default or "")
 
+                num_provinces = st.number_input(
+                    "Quy mô triển khai (số tỉnh/thành phố)",
+                    min_value=0,
+                    value=0,
+                    step=1,
+                    help="Nhập thủ công số tỉnh thành triển khai dự án. Hệ số Oper sẽ được cộng "
+                    "thêm: < 10 tỉnh thành → +0.01; 10-20 tỉnh thành → +0.02; > 20 tỉnh thành → +0.04.",
+                )
+
                 selected_services = st.multiselect(
                     "Danh sách dịch vụ (service_name) theo yêu cầu khách hàng",
                     service_names,
@@ -1760,6 +1804,7 @@ with tab_ops:
                             transaction_risk_score=transaction_risk_score,
                             order_date=order_date,
                             due_date=due_date,
+                            num_provinces=int(num_provinces) if num_provinces else None,
                         )
 
                         reserve_minimum = float(
