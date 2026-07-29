@@ -984,7 +984,7 @@ Nhiệm vụ:
 Quy tắc bắt buộc:
 - Không tự tạo thêm risk rule ngoài triggered_rules được cung cấp.
 - Không tuyên bố đã đánh giá rủi ro không có trong triggered_rules.
-- risk_level phải khớp với risk_level đã được Python tính (dùng lại nguyên giá trị). Đưa ra tất cả các giá trị risk level đang xuất hiện.  
+- risk_level đánh giá dựa trên Triggered Risk Rules. Nếu vi phạm 3 risk rule hoặc {gross_margin} < 16% trở lên thì phải xếp ở mức độ CRITICAL.
 - Nếu missing_fields không rỗng, phải nêu yêu cầu bổ sung dữ liệu.
 - Viết bằng tiếng Việt, ngắn gọn và có thể hành động.
 """
@@ -2360,8 +2360,10 @@ with tab_dashboard:
             st.markdown('<div class="dash-section-title dash-container"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: #ef4444;"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg> Quản trị Rủi ro</div>', unsafe_allow_html=True)
             
             risk_level = risk_result["risk_level"]
-            if risk_level in {"CRITICAL", "HIGH"}:
-                st.error(f"🚨 **Risk Level: {risk_level}**\n\nCần đặc biệt lưu ý và kiểm soát nghiêm ngặt.")
+            if risk_level == "CRITICAL":
+                st.error("🚨 **Risk Level: CRITICAL**\n\n🚨 Mức độ cực kỳ nguy hiểm! Cần đánh giá chuyên sâu trước khi thực hiện.")
+            elif risk_level == "HIGH":
+                st.error("⚠️ **Risk Level: HIGH**\n\nCần đặc biệt lưu ý và kiểm soát nghiêm ngặt.")
             elif risk_level == "MEDIUM":
                 st.warning(f"⚠️ **Risk Level: {risk_level}**\n\nRủi ro có thể chấp nhận nếu tuân thủ điều kiện bảo vệ.")
             else:
