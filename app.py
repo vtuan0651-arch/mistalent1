@@ -740,17 +740,6 @@ def evaluate_risk_rules(
         risk_level = "MEDIUM"
     else:
         risk_level = "LOW"
-    eligible_options = [item for item in partner_matrix if item.get("eligible")]
-    
-    if eligible_options:
-        total_rate = eligible_options[0]["total_cost_rate"]
-        critical_gm_threshold = total_rate * 3
-    else:
-        # Chưa có gói vay eligible nào -> không có total_rate -> dùng ngưỡng cố định làm fallback
-        critical_gm_threshold = 0.16
-    
-    if finance_metrics["gross_margin"] < critical_gm_threshold or cash_projection["min_projected_closing_cash"] < 0:
-        risk_level = "CRITICAL"
     return {"triggered_rules": triggered, "risk_level": risk_level}
 
 
