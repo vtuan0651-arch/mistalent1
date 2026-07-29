@@ -1013,7 +1013,7 @@ Quy tắc bắt buộc:
   không tự tính lại.
 - Chỉ chọn phương án tài chính có eligible=true trong partner_matrix; nếu partner_matrix
   rỗng (không cần vay), selected_financing_option phải nêu rõ "Không cần huy động vốn ngoài".
-- Nếu requested_amount > 300,000,000 VND: human_approval_required=true (RR-005, Founder phê duyệt).So sánh đúng requested_amount > 300tr mới cần Founder phê duyệt. CẢNH BÁO CHỈ HIỂN THỊ THÔNG TIN LIÊN QUAN ĐẾN REQUESTED_AMOUNT
+- Nếu requested_amount > 300,000,000 VND: Hiển thị thông tin sau: 'Số tiền cần vay vốn lớn hơn 300 triệu VND. Yêu cầu Founder phê duyệt'. CẢNH BÁO CHỈ HIỂN THỊ KHI requested_amount > 300 còn lại bắt buộc không được hiển thị Cảnh báo. 
 - Không phát minh sản phẩm, lãi suất hoặc hạn mức ngoài dữ liệu được cung cấp.
 - three_reasons phải có chính xác 3 phần tử, MỖI phần tử đánh giá đúng 1 trong 3 chỉ số
   bắt buộc theo thứ tự cố định:
