@@ -1020,8 +1020,8 @@ Quy tắc bắt buộc:
           - Nếu gross margin < 0.28: Nội dung bắt buộc sinh ra: "Chỉ số Gross Margin hiện tại là {gross_margin}, bé hơn mức tiêu chuẩn 0.28 (Kích hoạt RR-003). Điều này sẽ ảnh hưởng trực tiếp đến khả năng tài chính của OPC, do đó bắt buộc phải tiến hành đàm phán lại với khách hàng."
           - Nếu gross margin > 0.28: Nội dung bắt buộc sinh ra: "Chỉ số Gross Margin hiện tại là {gross_margin}, lớn hơn hoặc bằng mức tiêu chuẩn 0.28. Mức biên lợi nhuận này đang ở trạng thái an toàn."
       (2) Đánh giá closing cash: lấy closing cash được tính toán ở trên, không được tự nghĩ ra số liệu hay tự ý thay đổi số liệu. 
-          - Nếu closing cash < 550 triệu: Nội dung bắt buộc sinh ra: "Projected Closing Cash hiện tại là {min_closing_cash} (min_closing_cash bắt buộc phải lấy đúng giá trị đã được tính ở trên không tự bịa), bé hơn mốc an toàn 550 triệu VND (Kích hoạt RR-002). Dự án đang có rủi ro về khả năng thanh khoản."
-          - Nếu closing cash > 550 triệu: Nội dung bắt buộc sinh ra: "Projected Closing Cash hiện tại là {min_closing_cash}  (min_closing_cash bắt buộc phải lấy đúng giá trị đã được tính ở trên không tự bịa), lớn hơn hoặc bằng mốc 550 triệu VND. Khả năng thanh khoản của dự án được đảm bảo."
+          - Nếu closing cash < 550 triệu: Nội dung bắt buộc sinh ra: "Projected Closing Cash hiện tại là {min_closing_cash}, bé hơn mốc an toàn 550 triệu VND (Kích hoạt RR-002). Dự án đang có rủi ro về khả năng thanh khoản."
+          - Nếu closing cash > 550 triệu: Nội dung bắt buộc sinh ra: "Projected Closing Cash hiện tại là {min_closing_cash}, lớn hơn hoặc bằng mốc 550 triệu VND. Khả năng thanh khoản của dự án được đảm bảo."
       (3) Đánh giá confidence score: 
           - Nếu confidence_score < 0.65 :Nội dung bắt buộc sinh ra: "Confidence Score hiện tại là {confidence_score}, bé hơn mức 0.65 (Kích hoạt RR-006 do RR-002 đã cảnh báo). Mức độ tin cậy của dữ liệu dự phóng thấp, cần rà soát lại đầu vào."
           - Nếu confidence_score > 0.65: "Confidence Score hiện tại là {confidence_score} (Không kích hoạt RR-006). Mức độ tin cậy của dữ liệu ở mức cao hơn 65% và có thể chấp nhận để ra quyết định."
