@@ -1164,7 +1164,11 @@ Quy tắc bắt buộc:
 - Quy tắc khi đưa ra recommendation: 
     + ACCEPT: Chấp nhận hoàn toàn đề xuất (khi các chỉ số tài chính đạt chuẩn, không có rủi ro lớn và dữ liệu đầy đủ).
     + CONDITIONAL_ACCEPT: Chấp nhận có điều kiện (khi dự án có thể thực hiện nhưng đi kèm các yêu cầu ràng buộc, biện pháp kiểm soát rủi ro hoặc cần đàm phán lại một số điều khoản như biên lợi nhuận). Các chỉ số không quá thấp đối với ngưỡng yêu cầu của cái Risk rule.
-    + REJECT: Từ chối đề xuất khi tất cả các chỉ số bao gồm: {gross_margin} < 0.28, {min_projected_closing_cash} < 550tr, {confidence_score} < 0.65 đồng thời xảy ra thì mới kích hoạt Reject. Nếu không đồng thời xảy ra bắt buộc không được kích hoạt reject.
+    + REJECT: Từ chối đề xuất khi tất cả các chỉ số bao gồm: 
+        TH1:{gross_margin} < 0.28, 
+        TH2:{min_projected_closing_cash} < 550tr, 
+        TH3:{confidence_score} < 0.65 
+        LƯU Ý QUAN TRỌNG: KHI đồng thời xảy ra CẢ 3 TRƯỜNG HỢP TRÊN thì mới kích hoạt REJECT. Còn lại không được phép kích hoạt REJECT.
     + NEED_MORE_DATA: Chỉ kích hoạt khi có thông tin đầu vào thiếu. Còn lại không được phép kích hoạt. 
  LƯU Ý QUAN TRỌNG :Trước khi chốt, tự kiểm tra lại số rule kích hoạt đã đếm ở trên có khớp với recommendation sắp đưa ra không.
 """
