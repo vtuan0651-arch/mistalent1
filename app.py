@@ -92,11 +92,6 @@ class RiskAgentOutput(BaseModel):
     human_confirmation_points: list[str]
     recommended_controls: list[str]
     unassessed_risks: list[str]
-    risk_summary: str = Field(
-        description="1-2 câu tiếng Việt tóm tắt mức độ rủi ro tổng thể và hành động "
-        "cần làm, tương ứng với risk_level, dùng để hiển thị ngay dưới badge Risk Level "
-        "trên Dashboard."
-    )
 
 
 ExactlyThreeReasons = Annotated[list[str], Field(min_length=3, max_length=3)]
@@ -985,63 +980,13 @@ Nhiệm vụ:
    RR-006 chỉ khi RR-002 đã xảy ra và confidence_score<0.65).
 2. Tổng hợp risk level, cảnh báo, biện pháp kiểm soát và điểm cần Founder xác nhận.
 3. Nêu rõ các rủi ro chưa thể đánh giá do thiếu nguồn dữ liệu (nếu có).
+
 Quy tắc bắt buộc:
 - Không tự tạo thêm risk rule ngoài triggered_rules được cung cấp.
 - Không tuyên bố đã đánh giá rủi ro không có trong triggered_rules.
+- risk_level đánh giá dựa trên Triggered Risk Rules. LƯU Ý: Nếu {gross_margin} < 0.16  thì Risk level bắt buộc hiển thị là CRITICAL.
 - Nếu missing_fields không rỗng, phải nêu yêu cầu bổ sung dữ liệu.
 - Viết bằng tiếng Việt, ngắn gọn và có thể hành động.
-- risk_summary (CHỈ ÁP DỤNG CHO MỤC RISK LEVEL, TUYỆT ĐỐI KHÔNG ÁP DỤNG CHO BẤT KỲ MỤC NÀO KHÁC):
-        Trước khi viết risk_summary, bắt buộc phải thực hiện các bước sau THEO ĐÚNG THỨ TỰ, không được bỏ qua bước nào, không được gộp bước:
-        
-        BƯỚC 1 - Xác định 2 giá trị đầu vào (không suy diễn, không lấy từ trường khác):
-           - gross_margin = {gross_margin}
-           - min_projected_closing_cash = {min_projected_closing_cash}
-        
-        BƯỚC 2 - Đánh giá RIÊNG LẺ từng điều kiện, trả lời ĐÚNG hoặc SAI cho từng cái:
-           - Điều kiện A: "{gross_margin} < 20%" -> ĐÚNG hay SAI?
-           - Điều kiện B: "{min_projected_closing_cash} < 0" -> ĐÚNG hay SAI?
-           (Lưu ý: chỉ so sánh số học thuần túy, kể cả khi giá trị rất gần ngưỡng
-            (ví dụ 19.4% vẫn là ĐÚNG với điều kiện < 20%, không được làm tròn hay
-            coi là "gần đạt" rồi bỏ qua).
-        
-        BƯỚC 3 - Đếm số lượng điều kiện ĐÚNG trong 2 điều kiện A và B ở Bước 2:
-           - Nếu CẢ HAI đều ĐÚNG (2/2) -> áp dụng TRƯỜNG HỢP 1.
-           - Nếu CHỈ ĐÚNG DUY NHẤT MỘT trong hai (1/2) -> áp dụng TRƯỜNG HỢP 2.
-           - Nếu CẢ HAI đều SAI (0/2) -> áp dụng TRƯỜNG HỢP 3.
-           TUYỆT ĐỐI KHÔNG được kết luận Trường hợp 2 nếu cả A và B đều ĐÚNG.
-           TUYỆT ĐỐI KHÔNG được kết luận Trường hợp 1 nếu chỉ có 1 điều kiện ĐÚNG.
-        
-        TRƯỜNG HỢP 1 (A đúng VÀ B đúng) -> risk_summary PHẢI LÀ CHÍNH XÁC:
-           "Vi phạm rất nghiêm trọng: mức biên lợi nhuận và tiền dự trữ đang ở mức rất
-           thấp cần đánh giá nghiêm ngặt lợi nhuận và khả năng thanh khoản."
-        
-        TRƯỜNG HỢP 2 (chỉ A đúng, hoặc chỉ B đúng) -> risk_summary PHẢI LÀ CHÍNH XÁC:
-           "Xem xét lại lợi nhuận và khả năng thanh khoản."
-        
-        TRƯỜNG HỢP 3 (A sai VÀ B sai) -> Không hiển thị bất kỳ cảnh báo nào liên quan đến quy tắc này.
-        
-        VÍ DỤ THAM CHIẾU (few-shot, bắt buộc dùng làm mẫu suy luận):
-           - Input: gross_margin = 19.4%, min_projected_closing_cash = -78 triệu
-             -> A: 19.4% < 20% = ĐÚNG
-             -> B: -78 < 0 = ĐÚNG
-             -> 2/2 đúng -> TRƯỜNG HỢP 1
-             -> Kết quả: "Vi phạm rất nghiêm trọng: mức biên lợi nhuận và tiền dự trữ
-                đang ở mức rất thấp cần đánh giá nghiêm ngặt lợi nhuận và khả năng
-                thanh khoản."
-           - Input: gross_margin = 25%, min_projected_closing_cash = -10 triệu
-             -> A: 25% < 20% = SAI
-             -> B: -10 < 0 = ĐÚNG
-             -> 1/2 đúng -> TRƯỜNG HỢP 2
-             -> Kết quả: "Xem xét lại lợi nhuận và khả năng thanh khoản."
-           - Input: gross_margin = 30%, min_projected_closing_cash = 200 triệu
-             -> A: SAI, B: SAI -> 0/2 -> TRƯỜNG HỢP 3 -> không hiển thị cảnh báo.
-        
-        Yêu cầu bắt buộc:
-           + Chỉ đánh giá dựa trên đúng hai biến {gross_margin} và {min_projected_closing_cash}.
-           + Không được thay đổi, diễn giải hoặc rút gọn nội dung cảnh báo.
-           + Không được áp dụng logic này cho bất kỳ phần nào ngoài Risk Level.
-           + Trước khi chốt risk_summary, tự kiểm tra lại: kết quả ở Bước 3 có khớp với
-             nội dung sắp xuất ra không? Nếu không khớp, phải sửa lại cho đúng Bước 3.
 """
     return call_structured_agent(client, model, instructions, payload, RiskAgentOutput, "Risk & Compliance Agent")
 
@@ -1067,21 +1012,7 @@ Quy tắc bắt buộc:
   không tự tính lại.
 - Chỉ chọn phương án tài chính có eligible=true trong partner_matrix; nếu partner_matrix
   rỗng (không cần vay), selected_financing_option phải nêu rõ "Không cần huy động vốn ngoài".
-- human_approval_required PHẢI được gán giá trị chính xác bằng kết quả so sánh sau, KHÔNG được tự ý gán true vì bất kỳ lý do nào khác (rủi ro thanh khoản, biên lợi
-  nhuận thấp, confidence score thấp, risk level cao, v.v. ĐỀU KHÔNG được dùng làm căn cứ cho trường này): 
-  human_approval_required = (requested_amount > 300,000,000 VND)
-    Cụ thể:
-        + Nếu requested_amount > 300,000,000 VND -> human_approval_required = true, và approval_reason PHẢI LÀ CHÍNH XÁC:
-          "Số tiền cần vay vốn lớn hơn 300 triệu VND. Yêu cầu Founder phê duyệt."
-        + Nếu requested_amount <= 300,000,000 VND -> human_approval_required = false, và approval_reason PHẢI LÀ CHUỖI RỖNG ("").
-        LƯU Ý: TUYỆT ĐỐI KHÔNG được viết approval_reason nói về rủi ro, biên lợi nhuận,thanh khoản, hay bất kỳ nội dung nào khác trong trường hợp này — các nội dung đó thuộc về Risk Agent (risk_summary), không thuộc phạm vi human_approval_required/approval_reason.
-    Ví dụ tham chiếu:
-        + requested_amount = 78,000,000 VND (dù gross_margin thấp, cash âm)
-          -> human_approval_required = false, approval_reason = ""
-        + requested_amount = 350,000,000 VND
-          -> human_approval_required = true, approval_reason = "Số tiền cần vay vốn
-             lớn hơn 300 triệu VND. Yêu cầu Founder phê duyệt."
-        LƯU Ý: Trước khi trả kết quả, tự kiểm tra lại: human_approval_required có đúng bằng phép so sánh requested_amount > 300,000,000 hay không. Nếu sai, phải sửa lại.     
+- Nếu requested_amount > 300,000,000 VND: Hiển thị thông tin sau: 'Số tiền cần vay vốn lớn hơn 300 triệu VND. Yêu cầu Founder phê duyệt'. CẢNH BÁO CHỈ HIỂN THỊ KHI requested_amount > 300 còn lại bắt buộc không được hiển thị Cảnh báo. 
 - Không phát minh sản phẩm, lãi suất hoặc hạn mức ngoài dữ liệu được cung cấp.
 - three_reasons phải có chính xác 3 phần tử, MỖI phần tử đánh giá đúng 1 trong 3 chỉ số
   bắt buộc theo thứ tự cố định:
@@ -1096,12 +1027,12 @@ Quy tắc bắt buộc:
           - Nếu confidence_score > 0.65: "Confidence Score hiện tại là {confidence_score} (Không kích hoạt RR-006). Mức độ tin cậy của dữ liệu ở mức cao hơn 65% và có thể chấp nhận để ra quyết định."
       Mỗi lý do phải nêu rõ số liệu cụ thể (giá trị chỉ số) và rule liên quan nếu có kích hoạt, không được viết chung chung hay gộp nhiều chỉ số vào 1 lý do.
       LƯU Ý: bắt buộc phải lấy đúng các chỉ số gross margin, closing cash, confidence score Ở TRÊN. Không được bịa chỉ số đầu vào, không lấy từ ngoài. 
-- protection_condition phải đánh giá dựa trên {gross_margin},{min_closing_cash},{confidence_score}. Đưa ra một điều kiện thương mại hoặc kiểm soát cụ thể cần Founder xác nhận. Không được đánh giá khách hàng. 
+- protection_condition phải đánh giá dựa trên {gross_margin},{min_closing_cash},{confidence_score}. Đưa ra một điều kiện thương mại hoặc kiểm soát cụ thể cần Founder xác nhận.
 - Viết bằng tiếng Việt, rõ ràng và bảo vệ được khi vấn đáp.
 - Quy tắc khi đưa ra recommendation: 
     + ACCEPT: Chấp nhận hoàn toàn đề xuất (khi các chỉ số tài chính đạt chuẩn, không có rủi ro lớn và dữ liệu đầy đủ).
     + CONDITIONAL_ACCEPT: Chấp nhận có điều kiện (khi dự án có thể thực hiện nhưng đi kèm các yêu cầu ràng buộc, biện pháp kiểm soát rủi ro hoặc cần đàm phán lại một số điều khoản như biên lợi nhuận). Các chỉ số không quá thấp đối với ngưỡng yêu cầu của cái Risk rule.
-    + REJECT: Từ chối đề xuất khi tất cả các chỉ số bao gồm: gross margin < 0.28, closing cash < 550tr, confidence score < 0.65 đồng thời xảy ra thì mới kích hoạt Reject. Nếu không đồng thời xảy ra bắt buộc không được kích hoạt reject.
+    + REJECT: Từ chối đề xuất (khi vi phạm các quy tắc rủi ro nghiêm trọng hoặc không đáp ứng các tiêu chuẩn cốt lõi) khi tất cả các chỉ số bao gồm: gross margin < 0.28, closing cash < 550tr, confidence score < 0.65 cùng xảy ra thì mới kích hoạt Reject. Nếu không đồng thời xảy ra bắt buộc không được kích hoạt reject.
     + NEED_MORE_DATA: Chỉ kích hoạt khi có thông tin đầu vào thiếu. Còn lại không được phép kích hoạt. 
 """
     return call_structured_agent(client, model, instructions, payload, DecisionAgentOutput)
@@ -2430,25 +2361,14 @@ with tab_dashboard:
             st.markdown('<div class="dash-section-title dash-container"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: #ef4444;"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg> Quản trị Rủi ro</div>', unsafe_allow_html=True)
             
             risk_level = risk_result["risk_level"]
-            # Mô tả do AI Risk Agent tự đề xuất (risk_summary), fallback về text
-            # mặc định nếu vì lý do nào đó model không trả field này.
-            ai_summary = risk_result.get("risk_summary", "").strip()
-            fallback_summary = {
-                "CRITICAL": "Mức độ cực kỳ nguy hiểm! Cần đánh giá chuyên sâu trước khi thực hiện.",
-                "HIGH": "Cần đặc biệt lưu ý và kiểm soát nghiêm ngặt.",
-                "MEDIUM": "Rủi ro có thể chấp nhận nếu tuân thủ điều kiện bảo vệ.",
-                "LOW": "Hợp đồng ở ngưỡng an toàn.",
-            }
-            summary_text = ai_summary or fallback_summary.get(risk_level, "")
-
             if risk_level == "CRITICAL":
-                st.error(f"🚨 **Risk Level: CRITICAL**\n\n{summary_text}")
+                st.error("🚨 **Risk Level: CRITICAL**\n\n🚨 Mức độ cực kỳ nguy hiểm! Cần đánh giá chuyên sâu trước khi thực hiện.")
             elif risk_level == "HIGH":
-                st.error(f"⚠️ **Risk Level: HIGH**\n\n{summary_text}")
+                st.error("⚠️ **Risk Level: HIGH**\n\nCần đặc biệt lưu ý và kiểm soát nghiêm ngặt.")
             elif risk_level == "MEDIUM":
-                st.warning(f"⚠️ **Risk Level: {risk_level}**\n\n{summary_text}")
+                st.warning(f"⚠️ **Risk Level: {risk_level}**\n\nRủi ro có thể chấp nhận nếu tuân thủ điều kiện bảo vệ.")
             else:
-                st.success(f"✅ **Risk Level: {risk_level}**\n\n{summary_text}")
+                st.success(f"✅ **Risk Level: {risk_level}**\n\nHợp đồng ở ngưỡng an toàn.")
                 
             st.markdown(f"""
 <div class="dash-container" style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 16px; padding: 20px; margin-top: 20px; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(251, 191, 36, 0.1);">
