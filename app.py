@@ -990,6 +990,9 @@ Quy tắc bắt buộc:
 - Không tự tạo thêm risk rule ngoài triggered_rules được cung cấp.
 - Không tuyên bố đã đánh giá rủi ro không có trong triggered_rules.
 - Risk level: Bắt buộc đánh giá các chỉ số gross margin, closing cash để đưa ra giải thích phù hợp cho founder. 
+    + Nếu {gross_margin} < 0.20: thì phải đặc biệt lưu ý vào vấn đề lợi nhuận đang rất thấp so với yêu cầu
+    + Nếu {min_projected_closing_cash} < 0: thì phải đặc biệt lưu ý vào vấn đề thành khoản. 
+    LƯU Ý: VẤN ĐỀ NÀY CHỈ ÁP DỤNG VỚI RISK LEVEL, KHÔNG ĐƯỢC ÁP DỤNG VỚI CÁC MỤC KHÁC. 
 - Nếu missing_fields không rỗng, phải nêu yêu cầu bổ sung dữ liệu.
 - Viết bằng tiếng Việt, ngắn gọn và có thể hành động.
 - risk_summary: viết đúng 1-2 câu, khớp với risk_level vừa xác định, nêu rõ mức độ
