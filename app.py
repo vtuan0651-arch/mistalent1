@@ -985,40 +985,63 @@ Nhiệm vụ:
    RR-006 chỉ khi RR-002 đã xảy ra và confidence_score<0.65).
 2. Tổng hợp risk level, cảnh báo, biện pháp kiểm soát và điểm cần Founder xác nhận.
 3. Nêu rõ các rủi ro chưa thể đánh giá do thiếu nguồn dữ liệu (nếu có).
-
 Quy tắc bắt buộc:
 - Không tự tạo thêm risk rule ngoài triggered_rules được cung cấp.
 - Không tuyên bố đã đánh giá rủi ro không có trong triggered_rules.
-- risk_summary (CHỈ ÁP DỤNG CHO MỤC RISK LEVEL, TUYỆT ĐỐI KHÔNG ÁP DỤNG CHO BẤT KỲ MỤC NÀO KHÁC):
-    Bắt buộc chỉ sử dụng đúng hai giá trị đầu vào:
-     + {gross_margin}
-     + {min_projected_closing_cash}
-    
-    KHÔNG được tự suy diễn, KHÔNG được sử dụng giá trị từ bất kỳ trường nào khác, KHÔNG được tự tạo số liệu.
-    
-    Quy tắc hiển thị:
-    1. Nếu đồng thời thỏa mãn:
-       - {gross_margin} < 20%
-       - VÀ {min_projected_closing_cash} < 0
-       Thì bắt buộc hiển thị chính xác nội dung sau:
-       "Vi phạm rất nghiêm trọng: mức biên lợi nhuận và tiền dự trữ đang ở mức rất thấp cần đánh giá nghiêm ngặt lợi nhuận và khả năng thanh khoản."
-    
-    2. Nếu chỉ có MỘT trong hai điều kiện sau xảy ra:
-       - {gross_margin} < 20%
-       - {min_projected_closing_cash} < 0
-       Thì bắt buộc hiển thị chính xác nội dung sau:
-       "Xem xét lại lợi nhuận và khả năng thanh khoản."
-    
-    3. Nếu cả hai điều kiện đều không xảy ra:
-       - Không hiển thị bất kỳ cảnh báo nào liên quan đến quy tắc này.
-    
-    Yêu cầu bắt buộc:
-         + Chỉ đánh giá dựa trên đúng hai biến {gross_margin} và {min_projected_closing_cash}.
-         + Không được thay đổi, diễn giải hoặc rút gọn nội dung cảnh báo.
-         + Phải chọn đúng duy nhất một trường hợp tương ứng với dữ liệu đầu vào.
-         + Không được áp dụng logic này cho bất kỳ phần nào ngoài Risk Level.
 - Nếu missing_fields không rỗng, phải nêu yêu cầu bổ sung dữ liệu.
 - Viết bằng tiếng Việt, ngắn gọn và có thể hành động.
+- risk_summary (CHỈ ÁP DỤNG CHO MỤC RISK LEVEL, TUYỆT ĐỐI KHÔNG ÁP DỤNG CHO BẤT KỲ MỤC NÀO KHÁC):
+        Trước khi viết risk_summary, bắt buộc phải thực hiện các bước sau THEO ĐÚNG THỨ TỰ, không được bỏ qua bước nào, không được gộp bước:
+        
+        BƯỚC 1 - Xác định 2 giá trị đầu vào (không suy diễn, không lấy từ trường khác):
+           - gross_margin = {gross_margin}
+           - min_projected_closing_cash = {min_projected_closing_cash}
+        
+        BƯỚC 2 - Đánh giá RIÊNG LẺ từng điều kiện, trả lời ĐÚNG hoặc SAI cho từng cái:
+           - Điều kiện A: "{gross_margin} < 20%" -> ĐÚNG hay SAI?
+           - Điều kiện B: "{min_projected_closing_cash} < 0" -> ĐÚNG hay SAI?
+           (Lưu ý: chỉ so sánh số học thuần túy, kể cả khi giá trị rất gần ngưỡng
+            (ví dụ 19.4% vẫn là ĐÚNG với điều kiện < 20%, không được làm tròn hay
+            coi là "gần đạt" rồi bỏ qua).
+        
+        BƯỚC 3 - Đếm số lượng điều kiện ĐÚNG trong 2 điều kiện A và B ở Bước 2:
+           - Nếu CẢ HAI đều ĐÚNG (2/2) -> áp dụng TRƯỜNG HỢP 1.
+           - Nếu CHỈ ĐÚNG DUY NHẤT MỘT trong hai (1/2) -> áp dụng TRƯỜNG HỢP 2.
+           - Nếu CẢ HAI đều SAI (0/2) -> áp dụng TRƯỜNG HỢP 3.
+           TUYỆT ĐỐI KHÔNG được kết luận Trường hợp 2 nếu cả A và B đều ĐÚNG.
+           TUYỆT ĐỐI KHÔNG được kết luận Trường hợp 1 nếu chỉ có 1 điều kiện ĐÚNG.
+        
+        TRƯỜNG HỢP 1 (A đúng VÀ B đúng) -> risk_summary PHẢI LÀ CHÍNH XÁC:
+           "Vi phạm rất nghiêm trọng: mức biên lợi nhuận và tiền dự trữ đang ở mức rất
+           thấp cần đánh giá nghiêm ngặt lợi nhuận và khả năng thanh khoản."
+        
+        TRƯỜNG HỢP 2 (chỉ A đúng, hoặc chỉ B đúng) -> risk_summary PHẢI LÀ CHÍNH XÁC:
+           "Xem xét lại lợi nhuận và khả năng thanh khoản."
+        
+        TRƯỜNG HỢP 3 (A sai VÀ B sai) -> Không hiển thị bất kỳ cảnh báo nào liên quan đến quy tắc này.
+        
+        VÍ DỤ THAM CHIẾU (few-shot, bắt buộc dùng làm mẫu suy luận):
+           - Input: gross_margin = 19.4%, min_projected_closing_cash = -78 triệu
+             -> A: 19.4% < 20% = ĐÚNG
+             -> B: -78 < 0 = ĐÚNG
+             -> 2/2 đúng -> TRƯỜNG HỢP 1
+             -> Kết quả: "Vi phạm rất nghiêm trọng: mức biên lợi nhuận và tiền dự trữ
+                đang ở mức rất thấp cần đánh giá nghiêm ngặt lợi nhuận và khả năng
+                thanh khoản."
+           - Input: gross_margin = 25%, min_projected_closing_cash = -10 triệu
+             -> A: 25% < 20% = SAI
+             -> B: -10 < 0 = ĐÚNG
+             -> 1/2 đúng -> TRƯỜNG HỢP 2
+             -> Kết quả: "Xem xét lại lợi nhuận và khả năng thanh khoản."
+           - Input: gross_margin = 30%, min_projected_closing_cash = 200 triệu
+             -> A: SAI, B: SAI -> 0/2 -> TRƯỜNG HỢP 3 -> không hiển thị cảnh báo.
+        
+        Yêu cầu bắt buộc:
+           + Chỉ đánh giá dựa trên đúng hai biến {gross_margin} và {min_projected_closing_cash}.
+           + Không được thay đổi, diễn giải hoặc rút gọn nội dung cảnh báo.
+           + Không được áp dụng logic này cho bất kỳ phần nào ngoài Risk Level.
+           + Trước khi chốt risk_summary, tự kiểm tra lại: kết quả ở Bước 3 có khớp với
+             nội dung sắp xuất ra không? Nếu không khớp, phải sửa lại cho đúng Bước 3.
 """
     return call_structured_agent(client, model, instructions, payload, RiskAgentOutput, "Risk & Compliance Agent")
 
