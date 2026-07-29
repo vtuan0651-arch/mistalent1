@@ -989,10 +989,64 @@ Nhiệm vụ:
 Quy tắc bắt buộc:
 - Không tự tạo thêm risk rule ngoài triggered_rules được cung cấp.
 - Không tuyên bố đã đánh giá rủi ro không có trong triggered_rules.
-- risk_summary: 
-    + Nếu ({gross_margin} < 20 % và {min_projected_closing_cash} < 0 ) ĐỒNG THỜI xảy ra thì phải hiển thị nội dung sau: 'Vi phạm rất nghiêm trọng: mức biên lợi nhuận và tiền dự trữ đang ở mức rất thấp cần đánh giá nghiêm ngặt lợi nhuận và khả năng thanh khoản.'
-    + Nếu ({gross_margin} < 20 % hoặc {min_projected_closing_cash} < 0 ) CHỈ MỘT TRONG HAI xảy ra thì phải hiển thị nội dung sau: 'Xem xét lại lợi nhuận và khả năng thanh khoản'
-    LƯU Ý: VẤN ĐỀ NÀY CHỈ ÁP DỤNG VỚI RISK LEVEL, KHÔNG ĐƯỢC ÁP DỤNG VỚI CÁC MỤC KHÁC. PHẢI LẤY ĐÚNG GIÁ TRỊ  {gross_margin} VÀ  {min_projected_closing_cash}. KHÔNG ĐƯỢC TỰ BỊA, KHÔNG LẤY BÊN NGOÀI. BẮT BUỘC ĐƯA HIỂN THỊ NỘI DUNG ĐÚNG TRƯỜNG HỢP XẢY RA Ở TRÊN.
+
+- risk_summary (CHỈ ÁP DỤNG CHO MỤC RISK LEVEL, TUYỆT ĐỐI KHÔNG ÁP DỤNG CHO
+  BẤT KỲ MỤC NÀO KHÁC):
+
+  Trước khi viết risk_summary, PHẢI thực hiện tuần tự các bước sau, không được
+  bỏ qua bước nào, không được gộp bước, không được kết luận trực tiếp:
+
+  BƯỚC 1 - Lấy đúng 2 giá trị được cung cấp, không suy diễn, không lấy từ
+  trường khác, không tự bịa số liệu:
+     - gross_margin = {gross_margin}
+     - min_projected_closing_cash = {min_projected_closing_cash}
+
+  BƯỚC 2 - Đánh giá RIÊNG LẺ từng điều kiện, trả lời ĐÚNG hoặc SAI cho từng cái
+  (chỉ so sánh số học thuần túy, kể cả khi giá trị rất gần ngưỡng — ví dụ 19.4%
+  vẫn là ĐÚNG với điều kiện < 20%, không được làm tròn hay coi là "gần đạt"
+  rồi bỏ qua):
+     - Điều kiện A: "{gross_margin} < 20%" -> ĐÚNG hay SAI?
+     - Điều kiện B: "{min_projected_closing_cash} < 0" -> ĐÚNG hay SAI?
+
+  BƯỚC 3 - Đếm số điều kiện ĐÚNG trong A và B, rồi chọn ĐÚNG DUY NHẤT MỘT
+  trường hợp tương ứng:
+     - Nếu CẢ HAI đều ĐÚNG (2/2) -> TRƯỜNG HỢP 1.
+     - Nếu CHỈ DUY NHẤT MỘT trong hai ĐÚNG (1/2) -> TRƯỜNG HỢP 2.
+     - Nếu CẢ HAI đều SAI (0/2) -> TRƯỜNG HỢP 3.
+     TUYỆT ĐỐI KHÔNG được kết luận TRƯỜNG HỢP 2 nếu cả A và B đều ĐÚNG.
+     TUYỆT ĐỐI KHÔNG được kết luận TRƯỜNG HỢP 1 nếu chỉ có 1 điều kiện ĐÚNG.
+
+  TRƯỜNG HỢP 1 (A đúng VÀ B đúng) -> risk_summary PHẢI LÀ CHÍNH XÁC:
+     "Vi phạm rất nghiêm trọng: mức biên lợi nhuận và tiền dự trữ đang ở mức
+     rất thấp cần đánh giá nghiêm ngặt lợi nhuận và khả năng thanh khoản."
+
+  TRƯỜNG HỢP 2 (chỉ A đúng, hoặc chỉ B đúng) -> risk_summary PHẢI LÀ CHÍNH XÁC:
+     "Xem xét lại lợi nhuận và khả năng thanh khoản."
+
+  TRƯỜNG HỢP 3 (A sai VÀ B sai) -> Không hiển thị bất kỳ cảnh báo nào liên quan
+  đến quy tắc này.
+
+  VÍ DỤ THAM CHIẾU (bắt buộc dùng làm mẫu suy luận, không được suy luận khác đi):
+     - gross_margin = 19.4%, min_projected_closing_cash = -78 triệu
+       -> A: 19.4% < 20% = ĐÚNG ; B: -78 < 0 = ĐÚNG -> 2/2 -> TRƯỜNG HỢP 1
+       -> "Vi phạm rất nghiêm trọng: mức biên lợi nhuận và tiền dự trữ đang ở
+          mức rất thấp cần đánh giá nghiêm ngặt lợi nhuận và khả năng thanh khoản."
+     - gross_margin = 25%, min_projected_closing_cash = -10 triệu
+       -> A: SAI ; B: ĐÚNG -> 1/2 -> TRƯỜNG HỢP 2
+       -> "Xem xét lại lợi nhuận và khả năng thanh khoản."
+     - gross_margin = 30%, min_projected_closing_cash = 200 triệu
+       -> A: SAI ; B: SAI -> 0/2 -> TRƯỜNG HỢP 3 -> không hiển thị cảnh báo.
+
+  Yêu cầu bắt buộc:
+     + Chỉ đánh giá dựa trên đúng hai biến {gross_margin} và
+       {min_projected_closing_cash}, không lấy giá trị từ nơi khác, không bịa số.
+     + Không được thay đổi, diễn giải, rút gọn hay viết lại nội dung cảnh báo
+       ở TRƯỜNG HỢP 1 và TRƯỜNG HỢP 2 — phải chép lại y nguyên câu chữ.
+     + Phải chọn đúng duy nhất một trong 3 trường hợp, không được trộn lẫn.
+     + Không được áp dụng logic này cho bất kỳ phần nào ngoài Risk Level.
+     + Trước khi chốt risk_summary, tự kiểm tra lại: kết quả Bước 3 có khớp với
+       nội dung sắp xuất ra không? Nếu không khớp, phải sửa lại cho đúng Bước 3.
+
 - Nếu missing_fields không rỗng, phải nêu yêu cầu bổ sung dữ liệu.
 - Viết bằng tiếng Việt, ngắn gọn và có thể hành động.
 """
@@ -1020,7 +1074,28 @@ Quy tắc bắt buộc:
   không tự tính lại.
 - Chỉ chọn phương án tài chính có eligible=true trong partner_matrix; nếu partner_matrix
   rỗng (không cần vay), selected_financing_option phải nêu rõ "Không cần huy động vốn ngoài".
-- Nếu requested_amount > 300,000,000 VND: Hiển thị thông tin sau: 'Số tiền cần vay vốn lớn hơn 300 triệu VND. Yêu cầu Founder phê duyệt'. CẢNH BÁO CHỈ HIỂN THỊ KHI requested_amount > 300 còn lại bắt buộc không được hiển thị Cảnh báo. 
+- human_approval_required PHẢI được gán giá trị chính xác bằng kết quả so sánh sau, KHÔNG được tự ý gán true vì bất kỳ lý do nào khác (rủi ro thanh khoản, biên lợi nhuận thấp, confidence score thấp, risk level cao, v.v. ĐỀU KHÔNG được dùng làm
+  căn cứ cho trường này):
+             human_approval_required = (requested_amount > 300,000,000 VND)
+    Cụ thể:
+        + Nếu requested_amount > 300,000,000 VND -> human_approval_required = true,
+          và approval_reason PHẢI LÀ CHÍNH XÁC:
+          "Số tiền cần vay vốn lớn hơn 300 triệu VND. Yêu cầu Founder phê duyệt."
+        + Nếu requested_amount <= 300,000,000 VND -> human_approval_required = false,
+          và approval_reason PHẢI LÀ CHUỖI RỖNG ("").
+          TUYỆT ĐỐI KHÔNG được viết approval_reason nói về rủi ro, biên lợi nhuận,
+          thanh khoản, hay bất kỳ nội dung nào khác trong trường hợp này — các nội
+          dung đó thuộc về Risk Agent (risk_summary), không thuộc phạm vi
+          human_approval_required/approval_reason.
+      Ví dụ tham chiếu:
+        + requested_amount = 78,000,000 VND (dù gross_margin thấp, cash âm)
+          -> human_approval_required = false, approval_reason = ""
+        + requested_amount = 350,000,000 VND
+          -> human_approval_required = true, approval_reason = "Số tiền cần vay vốn
+             lớn hơn 300 triệu VND. Yêu cầu Founder phê duyệt."
+      Trước khi trả kết quả, tự kiểm tra lại: human_approval_required có đúng bằng
+      phép so sánh requested_amount > 300,000,000 hay không. Nếu sai, phải sửa lại.
+
 - Không phát minh sản phẩm, lãi suất hoặc hạn mức ngoài dữ liệu được cung cấp.
 - three_reasons phải có chính xác 3 phần tử, MỖI phần tử đánh giá đúng 1 trong 3 chỉ số
   bắt buộc theo thứ tự cố định:
