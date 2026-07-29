@@ -92,6 +92,11 @@ class RiskAgentOutput(BaseModel):
     human_confirmation_points: list[str]
     recommended_controls: list[str]
     unassessed_risks: list[str]
+    risk_summary: str = Field(
+        description="1-2 câu tiếng Việt tóm tắt mức độ rủi ro tổng thể và hành động "
+        "cần làm, tương ứng với risk_level, dùng để hiển thị ngay dưới badge Risk Level "
+        "trên Dashboard."
+    )
 
 
 ExactlyThreeReasons = Annotated[list[str], Field(min_length=3, max_length=3)]
@@ -984,7 +989,10 @@ Nhiệm vụ:
 Quy tắc bắt buộc:
 - Không tự tạo thêm risk rule ngoài triggered_rules được cung cấp.
 - Không tuyên bố đã đánh giá rủi ro không có trong triggered_rules.
-- risk_level đánh giá dựa trên Triggered Risk Rules. LƯU Ý: Nếu {gross_margin} < 0.16  thì Risk level bắt buộc hiển thị là CRITICAL.
+- risk_summary: 
+    + Nếu ({gross_margin} < 20 % và {min_projected_closing_cash} < 0 ) ĐỒNG THỜI xảy ra thì phải hiển thị nội dung sau: 'Vi phạm rất nghiêm trọng: mức biên lợi nhuận và tiền dự trữ đang ở mức rất thấp cần đánh giá nghiêm ngặt lợi nhuận và khả năng thanh khoản.'
+    + Nếu ({gross_margin} < 20 % hoặc {min_projected_closing_cash} < 0 ) CHỈ MỘT TRONG HAI xảy ra thì phải hiển thị nội dung sau: 'Xem xét lại lợi nhuận và khả năng thanh khoản'
+    LƯU Ý: VẤN ĐỀ NÀY CHỈ ÁP DỤNG VỚI RISK LEVEL, KHÔNG ĐƯỢC ÁP DỤNG VỚI CÁC MỤC KHÁC. PHẢI LẤY ĐÚNG GIÁ TRỊ  {gross_margin} VÀ  {min_projected_closing_cash}. KHÔNG ĐƯỢC TỰ BỊA, KHÔNG LẤY BÊN NGOÀI. BẮT BUỘC ĐƯA HIỂN THỊ NỘI DUNG ĐÚNG TRƯỜNG HỢP XẢY RA Ở TRÊN.
 - Nếu missing_fields không rỗng, phải nêu yêu cầu bổ sung dữ liệu.
 - Viết bằng tiếng Việt, ngắn gọn và có thể hành động.
 """
@@ -1027,12 +1035,12 @@ Quy tắc bắt buộc:
           - Nếu confidence_score > 0.65: "Confidence Score hiện tại là {confidence_score} (Không kích hoạt RR-006). Mức độ tin cậy của dữ liệu ở mức cao hơn 65% và có thể chấp nhận để ra quyết định."
       Mỗi lý do phải nêu rõ số liệu cụ thể (giá trị chỉ số) và rule liên quan nếu có kích hoạt, không được viết chung chung hay gộp nhiều chỉ số vào 1 lý do.
       LƯU Ý: bắt buộc phải lấy đúng các chỉ số gross margin, closing cash, confidence score Ở TRÊN. Không được bịa chỉ số đầu vào, không lấy từ ngoài. 
-- protection_condition phải đánh giá dựa trên {gross_margin},{min_closing_cash},{confidence_score}. Đưa ra một điều kiện thương mại hoặc kiểm soát cụ thể cần Founder xác nhận.
+- protection_condition phải đánh giá dựa trên {gross_margin},{min_closing_cash},{confidence_score}. Đưa ra một điều kiện thương mại hoặc kiểm soát cụ thể cần Founder xác nhận. Không được đánh giá khách hàng. 
 - Viết bằng tiếng Việt, rõ ràng và bảo vệ được khi vấn đáp.
 - Quy tắc khi đưa ra recommendation: 
     + ACCEPT: Chấp nhận hoàn toàn đề xuất (khi các chỉ số tài chính đạt chuẩn, không có rủi ro lớn và dữ liệu đầy đủ).
     + CONDITIONAL_ACCEPT: Chấp nhận có điều kiện (khi dự án có thể thực hiện nhưng đi kèm các yêu cầu ràng buộc, biện pháp kiểm soát rủi ro hoặc cần đàm phán lại một số điều khoản như biên lợi nhuận). Các chỉ số không quá thấp đối với ngưỡng yêu cầu của cái Risk rule.
-    + REJECT: Từ chối đề xuất (khi vi phạm các quy tắc rủi ro nghiêm trọng hoặc không đáp ứng các tiêu chuẩn cốt lõi) khi tất cả các chỉ số bao gồm: gross margin < 0.28, closing cash < 550tr, confidence score < 0.65 cùng xảy ra thì mới kích hoạt Reject. Nếu không đồng thời xảy ra bắt buộc không được kích hoạt reject.
+    + REJECT: Từ chối đề xuất khi tất cả các chỉ số bao gồm: gross margin < 0.28, closing cash < 550tr, confidence score < 0.65 đồng thời xảy ra thì mới kích hoạt Reject. Nếu không đồng thời xảy ra bắt buộc không được kích hoạt reject.
     + NEED_MORE_DATA: Chỉ kích hoạt khi có thông tin đầu vào thiếu. Còn lại không được phép kích hoạt. 
 """
     return call_structured_agent(client, model, instructions, payload, DecisionAgentOutput)
@@ -2361,14 +2369,25 @@ with tab_dashboard:
             st.markdown('<div class="dash-section-title dash-container"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: #ef4444;"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg> Quản trị Rủi ro</div>', unsafe_allow_html=True)
             
             risk_level = risk_result["risk_level"]
+            # Mô tả do AI Risk Agent tự đề xuất (risk_summary), fallback về text
+            # mặc định nếu vì lý do nào đó model không trả field này.
+            ai_summary = risk_result.get("risk_summary", "").strip()
+            fallback_summary = {
+                "CRITICAL": "Mức độ cực kỳ nguy hiểm! Cần đánh giá chuyên sâu trước khi thực hiện.",
+                "HIGH": "Cần đặc biệt lưu ý và kiểm soát nghiêm ngặt.",
+                "MEDIUM": "Rủi ro có thể chấp nhận nếu tuân thủ điều kiện bảo vệ.",
+                "LOW": "Hợp đồng ở ngưỡng an toàn.",
+            }
+            summary_text = ai_summary or fallback_summary.get(risk_level, "")
+
             if risk_level == "CRITICAL":
-                st.error("🚨 **Risk Level: CRITICAL**\n\n🚨 Mức độ cực kỳ nguy hiểm! Cần đánh giá chuyên sâu trước khi thực hiện.")
+                st.error(f"🚨 **Risk Level: CRITICAL**\n\n{summary_text}")
             elif risk_level == "HIGH":
-                st.error("⚠️ **Risk Level: HIGH**\n\nCần đặc biệt lưu ý và kiểm soát nghiêm ngặt.")
+                st.error(f"⚠️ **Risk Level: HIGH**\n\n{summary_text}")
             elif risk_level == "MEDIUM":
-                st.warning(f"⚠️ **Risk Level: {risk_level}**\n\nRủi ro có thể chấp nhận nếu tuân thủ điều kiện bảo vệ.")
+                st.warning(f"⚠️ **Risk Level: {risk_level}**\n\n{summary_text}")
             else:
-                st.success(f"✅ **Risk Level: {risk_level}**\n\nHợp đồng ở ngưỡng an toàn.")
+                st.success(f"✅ **Risk Level: {risk_level}**\n\n{summary_text}")
                 
             st.markdown(f"""
 <div class="dash-container" style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 16px; padding: 20px; margin-top: 20px; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(251, 191, 36, 0.1);">
