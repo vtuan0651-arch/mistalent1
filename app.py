@@ -1066,57 +1066,114 @@ Nhiệm vụ:
 2. Tạo Decision Card gồm ĐÚNG 3 chỉ số bắt buộc (gross_margin, closing_cash,
    confidence_score), 1 phương án tài chính đề xuất, đúng 3 lý do và đúng 1
    điều kiện bảo vệ cần con người xác nhận.
-3. Đưa ra recommendation đề xuất cho Founder .
+3. Đưa ra recommendation đề xuất cho Founder.
 
 Quy tắc bắt buộc:
-- EXECUTIVE SUMMARY bắt buộc là nhận xét đánh giá đối với gói vay chứ không liên quan gì đến khách hàng. Phải đánh giá gói vay đang được đề xuất không tự động lấy gói vay khác. 
+
+- EXECUTIVE SUMMARY bắt buộc là nhận xét đánh giá đối với gói vay chứ không liên
+  quan gì đến khách hàng. Phải đánh giá gói vay đang được đề xuất, không tự động
+  lấy gói vay khác.
+
 - gross_margin, closing_cash, confidence_score PHẢI lấy đúng giá trị Python cung cấp,
   không tự tính lại.
+
 - Chỉ chọn phương án tài chính có eligible=true trong partner_matrix; nếu partner_matrix
   rỗng (không cần vay), selected_financing_option phải nêu rõ "Không cần huy động vốn ngoài".
-- human_approval_required PHẢI được gán giá trị chính xác bằng kết quả so sánh sau, KHÔNG được tự ý gán true vì bất kỳ lý do nào khác (rủi ro thanh khoản, biên lợi nhuận thấp, confidence score thấp, risk level cao, v.v. ĐỀU KHÔNG được dùng làm
+
+- human_approval_required PHẢI được gán giá trị chính xác bằng kết quả so sánh sau,
+  KHÔNG được tự ý gán true vì bất kỳ lý do nào khác (rủi ro thanh khoản, biên lợi
+  nhuận thấp, confidence score thấp, risk level cao, v.v. ĐỀU KHÔNG được dùng làm
   căn cứ cho trường này):
-             human_approval_required = (requested_amount > 300,000,000 VND)
-    Cụ thể:
-        + Nếu requested_amount > 300,000,000 VND -> human_approval_required = true,
-          và approval_reason PHẢI LÀ CHÍNH XÁC:
-          "Số tiền cần vay vốn lớn hơn 300 triệu VND. Yêu cầu Founder phê duyệt."
-        + Nếu requested_amount <= 300,000,000 VND -> human_approval_required = false,
-          và approval_reason PHẢI LÀ CHUỖI RỖNG ("").
-          TUYỆT ĐỐI KHÔNG được viết approval_reason nói về rủi ro, biên lợi nhuận,
-          thanh khoản, hay bất kỳ nội dung nào khác trong trường hợp này — các nội
-          dung đó thuộc về Risk Agent (risk_summary), không thuộc phạm vi
-          human_approval_required/approval_reason.
-      Ví dụ tham chiếu:
-        + requested_amount = 78,000,000 VND (dù gross_margin thấp, cash âm)
-          -> human_approval_required = false, approval_reason = ""
-        + requested_amount = 350,000,000 VND
-          -> human_approval_required = true, approval_reason = "Số tiền cần vay vốn
-             lớn hơn 300 triệu VND. Yêu cầu Founder phê duyệt."
-      Trước khi trả kết quả, tự kiểm tra lại: human_approval_required có đúng bằng
-      phép so sánh requested_amount > 300,000,000 hay không. Nếu sai, phải sửa lại.
+
+      human_approval_required = (requested_amount > 300,000,000 VND)
+
+  Cụ thể:
+    + Nếu requested_amount > 300,000,000 VND -> human_approval_required = true,
+      và approval_reason PHẢI LÀ CHÍNH XÁC:
+      "Số tiền cần vay vốn lớn hơn 300 triệu VND. Yêu cầu Founder phê duyệt."
+    + Nếu requested_amount <= 300,000,000 VND -> human_approval_required = false,
+      và approval_reason PHẢI LÀ CHUỖI RỖNG ("").
+      TUYỆT ĐỐI KHÔNG được viết approval_reason nói về rủi ro, biên lợi nhuận,
+      thanh khoản, hay bất kỳ nội dung nào khác trong trường hợp này — các nội
+      dung đó thuộc về Risk Agent (risk_summary), không thuộc phạm vi
+      human_approval_required/approval_reason.
+
+  Ví dụ tham chiếu:
+    + requested_amount = 78,000,000 VND (dù gross_margin thấp, cash âm)
+      -> human_approval_required = false, approval_reason = ""
+    + requested_amount = 350,000,000 VND
+      -> human_approval_required = true, approval_reason = "Số tiền cần vay vốn
+         lớn hơn 300 triệu VND. Yêu cầu Founder phê duyệt."
+
+  Trước khi trả kết quả, tự kiểm tra lại: human_approval_required có đúng bằng
+  phép so sánh requested_amount > 300,000,000 hay không. Nếu sai, phải sửa lại.
 
 - Không phát minh sản phẩm, lãi suất hoặc hạn mức ngoài dữ liệu được cung cấp.
-- three_reasons phải có chính xác 3 phần tử, MỖI phần tử đánh giá đúng 1 trong 3 chỉ số
-  bắt buộc theo thứ tự cố định:
-      (1) Đánh giá gross margin: lấy gross margin được tính toán ở trên, không được tự nghĩ ra số liệu hay tự ý thay đổi số liệu. 
-          - Nếu gross margin < 0.28: Nội dung bắt buộc sinh ra: "Chỉ số Gross Margin hiện tại là {gross_margin}, bé hơn mức tiêu chuẩn 0.28 (Kích hoạt RR-003). Điều này sẽ ảnh hưởng trực tiếp đến khả năng tài chính của OPC, do đó bắt buộc phải tiến hành đàm phán lại với khách hàng."
-          - Nếu gross margin > 0.28: Nội dung bắt buộc sinh ra: "Chỉ số Gross Margin hiện tại là {gross_margin}, lớn hơn hoặc bằng mức tiêu chuẩn 0.28. Mức biên lợi nhuận này đang ở trạng thái an toàn."
-      (2) Đánh giá min_projected_closing_cash: lấy min_projected_closing_cash được tính toán ở trên, không được tự nghĩ ra số liệu hay tự ý thay đổi số liệu. 
-          - Nếu min_projected_closing_cash < 550 triệu: Nội dung bắt buộc sinh ra: "Projected Closing Cash hiện tại là {min_projected_closing_cash}, bé hơn mốc an toàn 550 triệu VND (Kích hoạt RR-002). Dự án đang có rủi ro về khả năng thanh khoản."
-          - Nếu min_projected_closing_cash > 550 triệu: Nội dung bắt buộc sinh ra: "Projected Closing Cash hiện tại là {min_projected_closing_cash}, lớn hơn hoặc bằng mốc 550 triệu VND. Khả năng thanh khoản của dự án được đảm bảo."
-      (3) Đánh giá confidence score: 
-          - Nếu confidence_score < 0.65 :Nội dung bắt buộc sinh ra: "Confidence Score hiện tại là {confidence_score}, bé hơn mức 0.65 (Kích hoạt RR-006 do RR-002 đã cảnh báo). Mức độ tin cậy của dữ liệu dự phóng thấp, cần rà soát lại đầu vào."
-          - Nếu confidence_score > 0.65: "Confidence Score hiện tại là {confidence_score} (Không kích hoạt RR-006). Mức độ tin cậy của dữ liệu ở mức cao hơn 65% và có thể chấp nhận để ra quyết định."
-      Mỗi lý do phải nêu rõ số liệu cụ thể (giá trị chỉ số) và rule liên quan nếu có kích hoạt, không được viết chung chung hay gộp nhiều chỉ số vào 1 lý do.
-      LƯU Ý: bắt buộc phải lấy đúng các chỉ số gross margin, closing cash, confidence score Ở TRÊN. Không được bịa chỉ số đầu vào, không lấy từ ngoài. 
-- protection_condition phải đánh giá dựa trên {gross_margin},{min_closing_cash},{confidence_score}. Đưa ra một điều kiện thương mại hoặc kiểm soát cụ thể cần Founder xác nhận. Không được đánh giá khách hàng. 
+
+- three_reasons phải có chính xác 3 phần tử. Trước khi viết, PHẢI đánh giá tuần tự
+  từng chỉ số theo đúng phép so sánh sau (không được tự suy diễn ngưỡng khác):
+
+  (1) Gross Margin:
+      - Nếu gross_margin < 0.28 -> RR-003 = KÍCH HOẠT
+      - Nếu gross_margin >= 0.28 -> RR-003 = KHÔNG kích hoạt
+      Nội dung bắt buộc:
+        + KÍCH HOẠT: "Chỉ số Gross Margin hiện tại là {gross_margin}, bé hơn mức
+          tiêu chuẩn 0.28 (Kích hoạt RR-003). Điều này sẽ ảnh hưởng trực tiếp đến
+          khả năng tài chính của OPC, do đó bắt buộc phải tiến hành đàm phán lại
+          với khách hàng."
+        + KHÔNG kích hoạt: "Chỉ số Gross Margin hiện tại là {gross_margin}, lớn
+          hơn hoặc bằng mức tiêu chuẩn 0.28. Mức biên lợi nhuận này đang ở trạng
+          thái an toàn."
+
+  (2) Min Projected Closing Cash:
+      - Nếu min_projected_closing_cash < 550,000,000 VND -> RR-002 = KÍCH HOẠT
+      - Nếu min_projected_closing_cash >= 550,000,000 VND -> RR-002 = KHÔNG kích hoạt
+      Nội dung bắt buộc:
+        + KÍCH HOẠT: "Projected Closing Cash hiện tại là {min_projected_closing_cash},
+          bé hơn mốc an toàn 550 triệu VND (Kích hoạt RR-002). Dự án đang có rủi ro
+          về khả năng thanh khoản."
+        + KHÔNG kích hoạt: "Projected Closing Cash hiện tại là
+          {min_projected_closing_cash}, lớn hơn hoặc bằng mốc 550 triệu VND. Khả
+          năng thanh khoản của dự án được đảm bảo."
+
+  (3) Confidence Score:
+      - CHỈ đánh giá RR-006 khi RR-002 đã KÍCH HOẠT ở bước (2). Nếu RR-002 KHÔNG
+        kích hoạt thì RR-006 mặc định KHÔNG kích hoạt, bất kể confidence_score
+        là bao nhiêu.
+      - Nếu RR-002 kích hoạt VÀ confidence_score < 0.65 -> RR-006 = KÍCH HOẠT
+      - Nếu RR-002 kích hoạt VÀ confidence_score >= 0.65 -> RR-006 = KHÔNG kích hoạt
+      Nội dung bắt buộc:
+        + RR-006 KÍCH HOẠT: "Confidence Score hiện tại là {confidence_score}, bé
+          hơn mức 0.65 (Kích hoạt RR-006 do RR-002 đã cảnh báo). Mức độ tin cậy
+          của dữ liệu dự phóng thấp, cần rà soát lại đầu vào."
+        + RR-006 KHÔNG kích hoạt: "Confidence Score hiện tại là {confidence_score}
+          (Không kích hoạt RR-006). Mức độ tin cậy của dữ liệu ở mức cao hơn 65%
+          và có thể chấp nhận để ra quyết định."
+
+  Mỗi lý do phải nêu rõ số liệu cụ thể (giá trị chỉ số) và rule liên quan nếu có
+  kích hoạt, không được viết chung chung hay gộp nhiều chỉ số vào 1 lý do.
+  LƯU Ý: bắt buộc phải lấy đúng các chỉ số gross margin, closing cash, confidence
+  score Ở TRÊN. Không được bịa chỉ số đầu vào, không lấy từ ngoài.
+
+- protection_condition phải đánh giá dựa trên {gross_margin}, {min_closing_cash},
+  {confidence_score}. Đưa ra một điều kiện thương mại hoặc kiểm soát cụ thể cần
+  Founder xác nhận. Không được đánh giá khách hàng.
+
 - Viết bằng tiếng Việt, rõ ràng và bảo vệ được khi vấn đáp.
-- Quy tắc khi đưa ra recommendation: 
-    + ACCEPT: Chấp nhận hoàn toàn đề xuất (khi các chỉ số tài chính đạt chuẩn, không có rủi ro lớn và dữ liệu đầy đủ).
-    + CONDITIONAL_ACCEPT: Chấp nhận có điều kiện (khi dự án có thể thực hiện nhưng đi kèm các yêu cầu ràng buộc, biện pháp kiểm soát rủi ro hoặc cần đàm phán lại một số điều khoản như biên lợi nhuận). Các chỉ số không quá thấp đối với ngưỡng yêu cầu của cái Risk rule.
-    + REJECT: Từ chối đề xuất khi tất cả các chỉ số bao gồm: gross margin < 0.28, closing cash < 550tr, confidence score < 0.65 đồng thời xảy ra thì mới kích hoạt Reject. Nếu không đồng thời xảy ra bắt buộc không được kích hoạt reject.
-    + NEED_MORE_DATA: Chỉ kích hoạt khi có thông tin đầu vào thiếu. Còn lại không được phép kích hoạt. 
+
+- Quy tắc recommendation — PHẢI đếm số rule bị KÍCH HOẠT trong 3 rule ở trên
+  (RR-003, RR-002, RR-006) trước khi chọn, theo đúng bảng sau, không được tự
+  suy đoán ngoài bảng:
+
+    + missing_fields KHÔNG rỗng -> NEED_MORE_DATA (bất kể các rule khác thế nào).
+    + missing_fields RỖNG VÀ 0/3 rule kích hoạt -> ACCEPT.
+    + missing_fields RỖNG VÀ (1/3 hoặc 2/3) rule kích hoạt -> CONDITIONAL_ACCEPT.
+    + missing_fields RỖNG VÀ 3/3 rule kích hoạt (RR-003 VÀ RR-002 VÀ RR-006 đồng
+      thời) -> REJECT.
+
+  TUYỆT ĐỐI KHÔNG được chọn REJECT nếu không đủ cả 3/3. TUYỆT ĐỐI KHÔNG được
+  chọn ACCEPT nếu có bất kỳ rule nào kích hoạt. Trước khi chốt, tự kiểm tra lại
+  số rule kích hoạt đã đếm ở trên có khớp với recommendation sắp đưa ra không.
 """
     return call_structured_agent(client, model, instructions, payload, DecisionAgentOutput)
 
