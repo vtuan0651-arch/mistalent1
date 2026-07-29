@@ -984,7 +984,7 @@ Nhiệm vụ:
 Quy tắc bắt buộc:
 - Không tự tạo thêm risk rule ngoài triggered_rules được cung cấp.
 - Không tuyên bố đã đánh giá rủi ro không có trong triggered_rules.
-- risk_level đánh giá dựa trên Triggered Risk Rules. Nếu {gross_margin} < 0.16  thì phải xếp ở mức độ CRITICAL.
+- risk_level đánh giá dựa trên Triggered Risk Rules. LƯU Ý: Nếu {gross_margin} < 0.16  thì Risk level bắt buộc là CRITICAL.
 - Nếu missing_fields không rỗng, phải nêu yêu cầu bổ sung dữ liệu.
 - Viết bằng tiếng Việt, ngắn gọn và có thể hành động.
 """
