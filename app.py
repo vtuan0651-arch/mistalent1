@@ -989,17 +989,12 @@ Nhiệm vụ:
 Quy tắc bắt buộc:
 - Không tự tạo thêm risk rule ngoài triggered_rules được cung cấp.
 - Không tuyên bố đã đánh giá rủi ro không có trong triggered_rules.
-- risk_summary: 
+- risk_summary: Thực hiện so sánh và đưa ra lập luận sau: 
     + Nếu {gross_margin} < 20% và {min_projected_closing_cash} < 0 đồng thời xảy ra thì phải hiển thị nội dung sau: 'Vi phạm rất nghiêm trọng: mức biên lợi nhuận và tiền dự trữ đang ở mức rất thấp cần đánh giá nghiêm ngặt lợi nhuận và khả năng thanh khoản.'
     + Nếu {gross_margin} < 20% hoặc {min_projected_closing_cash} < 0 xảy ra thì phải hiển thị nội dung sau: 'Xem xét lại lợi nhuận và khả năng thanh khoản'
-    LƯU Ý: VẤN ĐỀ NÀY CHỈ ÁP DỤNG VỚI RISK LEVEL, KHÔNG ĐƯỢC ÁP DỤNG VỚI CÁC MỤC KHÁC. 
+    LƯU Ý: VẤN ĐỀ NÀY CHỈ ÁP DỤNG VỚI RISK LEVEL, KHÔNG ĐƯỢC ÁP DỤNG VỚI CÁC MỤC KHÁC. PHẢI LẤY ĐÚNG GIÁ TRỊ  {gross_margin} VÀ  {min_projected_closing_cash} KHÔNG ĐƯỢC TỰ BỊA, KHÔNG LẤY BÊN NGOÀI. BẮT BUỘC ĐƯA HIỂN THỊ NỘI DUNG ĐÚNG TRƯỜNG HỢP XẢY RA Ở TRÊN.
 - Nếu missing_fields không rỗng, phải nêu yêu cầu bổ sung dữ liệu.
 - Viết bằng tiếng Việt, ngắn gọn và có thể hành động.
-- risk_summary: viết đúng 1-2 câu, khớp với risk_level vừa xác định, nêu rõ mức độ
-  nghiêm trọng và hành động cần làm tiếp theo (ví dụ: cần kiểm soát nghiêm ngặt,
-  cần đánh giá chuyên sâu, có thể chấp nhận nếu tuân thủ điều kiện bảo vệ, ở ngưỡng
-  an toàn...). Không lặp lại nguyên văn ví dụ, hãy diễn giải theo đúng bối cảnh của
-  các triggered_rules và warnings đã nêu.
 """
     return call_structured_agent(client, model, instructions, payload, RiskAgentOutput, "Risk & Compliance Agent")
 
