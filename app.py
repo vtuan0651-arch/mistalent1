@@ -739,9 +739,8 @@ def evaluate_risk_rules(
         risk_level = "MEDIUM"
     else:
         risk_level = "LOW"
-    if finance_metrics["gross_margin"] < 0.16:
-        risk_level = "CRITICAL"
-    if cash_projection["min_projected_closing_cash"] < -100_000_000:
+    critical_gm_threshold = total_rate * 3
+    if finance_metrics["gross_margin"] < critical_gm_threshold and cash_projection["min_projected_closing_cash"] < 0:
         risk_level = "CRITICAL"
     return {"triggered_rules": triggered, "risk_level": risk_level}
 
