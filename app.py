@@ -1005,6 +1005,7 @@ Nhiệm vụ:
    confidence_score), 1 phương án tài chính đề xuất, đúng 3 lý do và đúng 1
    điều kiện bảo vệ cần con người xác nhận.
 3. Đưa ra recommendation đề xuất cho Founder .
+4. Đưa ra CẢNH BÁO đến founder
 
 Quy tắc bắt buộc:
 - EXECUTIVE SUMMARY bắt buộc là nhận xét đánh giá đối với gói vay chứ không liên quan gì đến khách hàng. Phải đánh giá gói vay đang được đề xuất không tự động lấy gói vay khác. 
@@ -1012,7 +1013,7 @@ Quy tắc bắt buộc:
   không tự tính lại.
 - Chỉ chọn phương án tài chính có eligible=true trong partner_matrix; nếu partner_matrix
   rỗng (không cần vay), selected_financing_option phải nêu rõ "Không cần huy động vốn ngoài".
-- Nếu requested_amount > 300,000,000 VND: human_approval_required=true (RR-005, Founder phê duyệt).
+- Nếu requested_amount > 300,000,000 VND: human_approval_required=true (RR-005, Founder phê duyệt).So sánh đúng requested_amount > 300tr mới cần Founder phê duyệt. CẢNH BÁO CHỈ HIỂN THỊ THÔNG TIN LIÊN QUAN ĐẾN REQUESTED_AMOUNT
 - Không phát minh sản phẩm, lãi suất hoặc hạn mức ngoài dữ liệu được cung cấp.
 - three_reasons phải có chính xác 3 phần tử, MỖI phần tử đánh giá đúng 1 trong 3 chỉ số
   bắt buộc theo thứ tự cố định:
@@ -1029,7 +1030,6 @@ Quy tắc bắt buộc:
       LƯU Ý: bắt buộc phải lấy đúng các chỉ số gross margin, closing cash, confidence score Ở TRÊN. Không được bịa chỉ số đầu vào, không lấy từ ngoài. 
 - protection_condition phải đánh giá dựa trên {gross_margin},{min_closing_cash},{confidence_score}. Đưa ra một điều kiện thương mại hoặc kiểm soát cụ thể cần Founder xác nhận.
 - Viết bằng tiếng Việt, rõ ràng và bảo vệ được khi vấn đáp.
-- So sánh đúng requested_amount > 300tr mới cần Founder phê duyệt.
 - Quy tắc khi đưa ra recommendation: 
     + ACCEPT: Chấp nhận hoàn toàn đề xuất (khi các chỉ số tài chính đạt chuẩn, không có rủi ro lớn và dữ liệu đầy đủ).
     + CONDITIONAL_ACCEPT: Chấp nhận có điều kiện (khi dự án có thể thực hiện nhưng đi kèm các yêu cầu ràng buộc, biện pháp kiểm soát rủi ro hoặc cần đàm phán lại một số điều khoản như biên lợi nhuận). Các chỉ số không quá thấp đối với ngưỡng yêu cầu của cái Risk rule.
