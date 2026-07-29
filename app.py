@@ -984,7 +984,7 @@ Nhiệm vụ:
 Quy tắc bắt buộc:
 - Không tự tạo thêm risk rule ngoài triggered_rules được cung cấp.
 - Không tuyên bố đã đánh giá rủi ro không có trong triggered_rules.
-- risk_level phải khớp với risk_level đã được Python tính (dùng lại nguyên giá trị).
+- risk_level phải khớp với risk_level đã được Python tính (dùng lại nguyên giá trị). Đưa ra tất cả các giá trị risk level đang xuất hiện.  
 - Nếu missing_fields không rỗng, phải nêu yêu cầu bổ sung dữ liệu.
 - Viết bằng tiếng Việt, ngắn gọn và có thể hành động.
 """
