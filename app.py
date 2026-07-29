@@ -1170,7 +1170,31 @@ Quy tắc bắt buộc:
         TH3:{confidence_score} < 0.65 
         LƯU Ý QUAN TRỌNG: KHI đồng thời xảy ra CẢ 3 TRƯỜNG HỢP TRÊN thì mới kích hoạt REJECT. Còn lại không được phép kích hoạt REJECT.
     + NEED_MORE_DATA: Chỉ kích hoạt khi có thông tin đầu vào thiếu. Còn lại không được phép kích hoạt. 
- LƯU Ý QUAN TRỌNG :Trước khi chốt, tự kiểm tra lại số rule kích hoạt đã đếm ở trên có khớp với recommendation sắp đưa ra không.
+    
+    VÍ DỤ THAM CHIẾU (bắt buộc dùng làm mẫu suy luận, không được suy luận khác đi
+  dù nội dung ba lý do phía trên có nhắc đến "rủi ro nghiêm trọng" hay không —
+  ba lý do (three_reasons) và recommendation là HAI BƯỚC ĐỘC LẬP, không được để
+  giọng văn cảnh báo trong three_reasons ảnh hưởng đến kết quả đếm rule):
+
+    - gross_margin = 19.4%, min_projected_closing_cash = -78 triệu,
+      confidence_score = 76%
+      -> RR-003: 19.4% < 28% = KÍCH HOẠT
+      -> RR-002: -78tr < 550tr = KÍCH HOẠT
+      -> RR-006: RR-002 kích hoạt NHƯNG confidence_score 76% >= 65% = KHÔNG kích hoạt
+      -> Đếm: 2/3 kích hoạt (RR-003, RR-002) -> CONDITIONAL_ACCEPT
+      -> KHÔNG được chọn REJECT trong trường hợp này, dù risk_summary ở Risk Agent
+         có ghi "Vi phạm rất nghiêm trọng" — risk_summary mô tả mức độ rủi ro của
+         2 chỉ số (gross_margin, cash), KHÔNG quyết định recommendation.
+         recommendation CHỈ được quyết định bởi bảng đếm 3 rule RR-003/RR-002/RR-006.
+
+    - gross_margin = 15%, min_projected_closing_cash = -100 triệu,
+      confidence_score = 50%
+      -> RR-003: KÍCH HOẠT ; RR-002: KÍCH HOẠT ; RR-006: RR-002 kích hoạt VÀ
+         confidence 50% < 65% = KÍCH HOẠT
+      -> Đếm: 3/3 -> REJECT
+ LƯU Ý QUAN TRỌNG :  Trước khi chốt recommendation, PHẢI viết ra rõ ràng: "Số rule kích hoạt: X/3"
+  rồi mới tra bảng để chọn recommendation. Không được chọn recommendation trước
+  rồi mới biện minh bằng số rule.
 """
     return call_structured_agent(client, model, instructions, payload, DecisionAgentOutput)
 
