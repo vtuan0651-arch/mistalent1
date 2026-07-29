@@ -990,9 +990,9 @@ Quy tắc bắt buộc:
 - Không tự tạo thêm risk rule ngoài triggered_rules được cung cấp.
 - Không tuyên bố đã đánh giá rủi ro không có trong triggered_rules.
 - risk_summary: Thực hiện so sánh và đưa ra lập luận sau: 
-    + Nếu {gross_margin} < 20% và {min_projected_closing_cash} < 0 ĐỒNG THỜI xảy ra thì phải hiển thị nội dung sau: 'Vi phạm rất nghiêm trọng: mức biên lợi nhuận và tiền dự trữ đang ở mức rất thấp cần đánh giá nghiêm ngặt lợi nhuận và khả năng thanh khoản.'
-    + Nếu {gross_margin} < 20% hoặc {min_projected_closing_cash} < 0 CHỈ MỘT TRONG HAI xảy ra thì phải hiển thị nội dung sau: 'Xem xét lại lợi nhuận và khả năng thanh khoản'
-    LƯU Ý: VẤN ĐỀ NÀY CHỈ ÁP DỤNG VỚI RISK LEVEL, KHÔNG ĐƯỢC ÁP DỤNG VỚI CÁC MỤC KHÁC. PHẢI LẤY ĐÚNG GIÁ TRỊ  {gross_margin} VÀ  {min_projected_closing_cash} KHÔNG ĐƯỢC TỰ BỊA, KHÔNG LẤY BÊN NGOÀI. BẮT BUỘC ĐƯA HIỂN THỊ NỘI DUNG ĐÚNG TRƯỜNG HỢP XẢY RA Ở TRÊN.
+    + Nếu ({gross_margin} < 20 % và {min_projected_closing_cash} < 0 ) ĐỒNG THỜI xảy ra thì phải hiển thị nội dung sau: 'Vi phạm rất nghiêm trọng: mức biên lợi nhuận và tiền dự trữ đang ở mức rất thấp cần đánh giá nghiêm ngặt lợi nhuận và khả năng thanh khoản.'
+    + Nếu ({gross_margin} < 20 % hoặc {min_projected_closing_cash} < 0 ) CHỈ MỘT TRONG HAI xảy ra thì phải hiển thị nội dung sau: 'Xem xét lại lợi nhuận và khả năng thanh khoản'
+    LƯU Ý: VẤN ĐỀ NÀY CHỈ ÁP DỤNG VỚI RISK LEVEL, KHÔNG ĐƯỢC ÁP DỤNG VỚI CÁC MỤC KHÁC. PHẢI LẤY ĐÚNG GIÁ TRỊ  {gross_margin} VÀ  {min_projected_closing_cash}. KHÔNG ĐƯỢC TỰ BỊA, KHÔNG LẤY BÊN NGOÀI. BẮT BUỘC ĐƯA HIỂN THỊ NỘI DUNG ĐÚNG TRƯỜNG HỢP XẢY RA Ở TRÊN.
 - Nếu missing_fields không rỗng, phải nêu yêu cầu bổ sung dữ liệu.
 - Viết bằng tiếng Việt, ngắn gọn và có thể hành động.
 """
