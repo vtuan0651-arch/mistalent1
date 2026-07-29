@@ -989,10 +989,34 @@ Nhiệm vụ:
 Quy tắc bắt buộc:
 - Không tự tạo thêm risk rule ngoài triggered_rules được cung cấp.
 - Không tuyên bố đã đánh giá rủi ro không có trong triggered_rules.
-- risk_summary: 
-    + Nếu ({gross_margin} < 20 % và {min_projected_closing_cash} < 0 ) ĐỒNG THỜI xảy ra thì phải hiển thị nội dung sau: 'Vi phạm rất nghiêm trọng: mức biên lợi nhuận và tiền dự trữ đang ở mức rất thấp cần đánh giá nghiêm ngặt lợi nhuận và khả năng thanh khoản.'
-    + Nếu ({gross_margin} < 20 % hoặc {min_projected_closing_cash} < 0 ) CHỈ MỘT TRONG HAI xảy ra thì phải hiển thị nội dung sau: 'Xem xét lại lợi nhuận và khả năng thanh khoản'
-    LƯU Ý: VẤN ĐỀ NÀY CHỈ ÁP DỤNG VỚI RISK LEVEL, KHÔNG ĐƯỢC ÁP DỤNG VỚI CÁC MỤC KHÁC. PHẢI LẤY ĐÚNG GIÁ TRỊ  {gross_margin} VÀ  {min_projected_closing_cash}. KHÔNG ĐƯỢC TỰ BỊA, KHÔNG LẤY BÊN NGOÀI. BẮT BUỘC ĐƯA HIỂN THỊ NỘI DUNG ĐÚNG TRƯỜNG HỢP XẢY RA Ở TRÊN.
+- risk_summary (CHỈ ÁP DỤNG CHO MỤC RISK LEVEL, TUYỆT ĐỐI KHÔNG ÁP DỤNG CHO BẤT KỲ MỤC NÀO KHÁC):
+    Bắt buộc chỉ sử dụng đúng hai giá trị đầu vào:
+     + {gross_margin}
+     + {min_projected_closing_cash}
+    
+    KHÔNG được tự suy diễn, KHÔNG được sử dụng giá trị từ bất kỳ trường nào khác, KHÔNG được tự tạo số liệu.
+    
+    Quy tắc hiển thị:
+    1. Nếu đồng thời thỏa mãn:
+       - {gross_margin} < 20%
+       - VÀ {min_projected_closing_cash} < 0
+       Thì bắt buộc hiển thị chính xác nội dung sau:
+       "Vi phạm rất nghiêm trọng: mức biên lợi nhuận và tiền dự trữ đang ở mức rất thấp cần đánh giá nghiêm ngặt lợi nhuận và khả năng thanh khoản."
+    
+    2. Nếu chỉ có MỘT trong hai điều kiện sau xảy ra:
+       - {gross_margin} < 20%
+       - {min_projected_closing_cash} < 0
+       Thì bắt buộc hiển thị chính xác nội dung sau:
+       "Xem xét lại lợi nhuận và khả năng thanh khoản."
+    
+    3. Nếu cả hai điều kiện đều không xảy ra:
+       - Không hiển thị bất kỳ cảnh báo nào liên quan đến quy tắc này.
+    
+    Yêu cầu bắt buộc:
+         + Chỉ đánh giá dựa trên đúng hai biến {gross_margin} và {min_projected_closing_cash}.
+         + Không được thay đổi, diễn giải hoặc rút gọn nội dung cảnh báo.
+         + Phải chọn đúng duy nhất một trường hợp tương ứng với dữ liệu đầu vào.
+         + Không được áp dụng logic này cho bất kỳ phần nào ngoài Risk Level.
 - Nếu missing_fields không rỗng, phải nêu yêu cầu bổ sung dữ liệu.
 - Viết bằng tiếng Việt, ngắn gọn và có thể hành động.
 """
