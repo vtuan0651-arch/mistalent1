@@ -989,7 +989,14 @@ Nhiệm vụ:
 Quy tắc bắt buộc:
 - Không tự tạo thêm risk rule ngoài triggered_rules được cung cấp.
 - Không tuyên bố đã đánh giá rủi ro không có trong triggered_rules.
-- risk_level đánh giá dựa trên Triggered Risk Rules. LƯU Ý: Nếu {gross_margin} < 0.16  thì Risk level bắt buộc hiển thị là CRITICAL.
+- Risk level: 
+    Nhiệm vụ: Đánh giá và xác định `Risk_level` cho dự án dựa trên các quy tắc rủi ro kích hoạt (`Triggered Risk Rules`) và các chỉ số tài chính đã trích xuất ở trên.
+    Các quy tắc đánh giá bắt buộc:
+    1. Phân tích mức độ nghiêm trọng của 2 chỉ số cốt lõi: `gross margin` và `min project closing cash`.
+    2. Đánh giá mức độ rủi ro (`Risk_level`) cao/nghiêm trọng nếu vi phạm các ngưỡng sau:
+       - Gross Margin: < 20% (Được đánh giá là RẤT NGHIÊM TRỌNG).
+       - Min Project Closing Cash: < 0 (Được đánh giá là RẤT NGHIÊM TRỌNG).
+    3. Tổng hợp kết quả để đưa ra mức đánh giá risk level cuối cùng của dự án kèm theo giải thích ngắn gọn dựa trên các ngưỡng trên.
 - Nếu missing_fields không rỗng, phải nêu yêu cầu bổ sung dữ liệu.
 - Viết bằng tiếng Việt, ngắn gọn và có thể hành động.
 - risk_summary: viết đúng 1-2 câu, khớp với risk_level vừa xác định, nêu rõ mức độ
