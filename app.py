@@ -388,7 +388,7 @@ def compute_oper_coefficient(
     breakdown.append({"tieu_chi": "Rủi ro con người (Human Risk Factor - cố định)", "he_so": 0.01})
 
     if province is not None and not is_core_city(province):
-        oper += 0.03
+        oper += 0.01 
         breakdown.append({"tieu_chi": f"Mở rộng địa bàn ({province})", "he_so": 0.01})
 
     if transaction_risk_score is not None and transaction_risk_score > 85:
