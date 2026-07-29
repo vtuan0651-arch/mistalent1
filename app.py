@@ -1067,7 +1067,21 @@ Quy tắc bắt buộc:
   không tự tính lại.
 - Chỉ chọn phương án tài chính có eligible=true trong partner_matrix; nếu partner_matrix
   rỗng (không cần vay), selected_financing_option phải nêu rõ "Không cần huy động vốn ngoài".
-- Nếu requested_amount > 300,000,000 VND: Hiển thị thông tin sau: 'Số tiền cần vay vốn lớn hơn 300 triệu VND. Yêu cầu Founder phê duyệt'. CẢNH BÁO CHỈ HIỂN THỊ KHI requested_amount > 300 còn lại bắt buộc không được hiển thị Cảnh báo. 
+- human_approval_required PHẢI được gán giá trị chính xác bằng kết quả so sánh sau, KHÔNG được tự ý gán true vì bất kỳ lý do nào khác (rủi ro thanh khoản, biên lợi
+  nhuận thấp, confidence score thấp, risk level cao, v.v. ĐỀU KHÔNG được dùng làm căn cứ cho trường này): 
+  human_approval_required = (requested_amount > 300,000,000 VND)
+    Cụ thể:
+        + Nếu requested_amount > 300,000,000 VND -> human_approval_required = true, và approval_reason PHẢI LÀ CHÍNH XÁC:
+          "Số tiền cần vay vốn lớn hơn 300 triệu VND. Yêu cầu Founder phê duyệt."
+        + Nếu requested_amount <= 300,000,000 VND -> human_approval_required = false, và approval_reason PHẢI LÀ CHUỖI RỖNG ("").
+        LƯU Ý: TUYỆT ĐỐI KHÔNG được viết approval_reason nói về rủi ro, biên lợi nhuận,thanh khoản, hay bất kỳ nội dung nào khác trong trường hợp này — các nội dung đó thuộc về Risk Agent (risk_summary), không thuộc phạm vi human_approval_required/approval_reason.
+    Ví dụ tham chiếu:
+        + requested_amount = 78,000,000 VND (dù gross_margin thấp, cash âm)
+          -> human_approval_required = false, approval_reason = ""
+        + requested_amount = 350,000,000 VND
+          -> human_approval_required = true, approval_reason = "Số tiền cần vay vốn
+             lớn hơn 300 triệu VND. Yêu cầu Founder phê duyệt."
+        LƯU Ý: Trước khi trả kết quả, tự kiểm tra lại: human_approval_required có đúng bằng phép so sánh requested_amount > 300,000,000 hay không. Nếu sai, phải sửa lại.     
 - Không phát minh sản phẩm, lãi suất hoặc hạn mức ngoài dữ liệu được cung cấp.
 - three_reasons phải có chính xác 3 phần tử, MỖI phần tử đánh giá đúng 1 trong 3 chỉ số
   bắt buộc theo thứ tự cố định:
