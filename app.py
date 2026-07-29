@@ -685,6 +685,7 @@ def evaluate_risk_rules(
     finance_metrics: dict,
     cash_projection: dict,
     confidence_result: Optional[dict],
+    partner_matrix: list[dict],
 ) -> dict:
     rules = data["13_RISK_RULES"]
     rule_lookup = {str(r["rule_id"]): r for _, r in rules.iterrows()}
@@ -739,9 +740,19 @@ def evaluate_risk_rules(
         risk_level = "MEDIUM"
     else:
         risk_level = "LOW"
-    critical_gm_threshold = total_rate * 3
-    if finance_metrics["gross_margin"] < critical_gm_threshold and cash_projection["min_projected_closing_cash"] < 0:
+    eligible_options = [item for item in partner_matrix if item.get("eligible")]
+    
+    if eligible_options:
+        total_rate = eligible_options[0]["total_cost_rate"]
+        critical_gm_threshold = total_rate * 3
+    else:
+        # Chưa có gói vay eligible nào -> không có total_rate -> dùng ngưỡng cố định làm fallback
+        critical_gm_threshold = 0.16
+    
+    if finance_metrics["gross_margin"] < critical_gm_threshold or cash_projection["min_projected_closing_cash"] < 0:
         risk_level = "CRITICAL"
+
+return {"triggered_rules": triggered, "risk_level": risk_level}
     return {"triggered_rules": triggered, "risk_level": risk_level}
 
 
@@ -1781,6 +1792,7 @@ with tab_ops:
                             finance_metrics=finance_metrics,
                             cash_projection=cash_projection,
                             confidence_result=confidence_result,
+                            partner_matrix=partner_matrix,
                         )
 
                         client = OpenAI(api_key=api_key)
