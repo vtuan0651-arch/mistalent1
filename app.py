@@ -1069,67 +1069,27 @@ Nhiệm vụ:
 3. Đưa ra recommendation đề xuất cho Founder.
 
 Quy tắc bắt buộc:
-- Quy tắc khi đưa ra recommendation:
-      BƯỚC 0 - Kiểm tra dữ liệu đầu vào (ưu tiên cao nhất, kiểm tra trước mọi rule khác):
-         Nếu missing_fields KHÔNG rỗng -> recommendation = NEED_MORE_DATA, DỪNG LẠI,
-         không cần đánh giá các bước bên dưới.
-         Nếu missing_fields rỗng -> chuyển sang BƯỚC 1.
+- Quy tắc recommendation:
+      BƯỚC 0: Nếu missing_fields không rỗng -> NEED_MORE_DATA, dừng lại.
     
-      BƯỚC 1 - TÁI SỬ DỤNG đúng trạng thái RR-003 / RR-002 / RR-006 đã xác định ở
-      phần three_reasons phía trên. TUYỆT ĐỐI KHÔNG được tính lại hay đánh giá lại
-      các rule này theo cách khác — recommendation phải đồng nhất 100% với kết quả
-      đã dùng để viết three_reasons. Nếu two bước ra kết quả khác nhau, đó là lỗi
-      và phải sửa lại cho khớp.
+      BƯỚC 1: Dùng ĐÚNG trạng thái RR-003/RR-002/RR-006 đã xác định ở three_reasons
+      (không tính lại, không đánh giá khác đi).
     
-      BƯỚC 2 - Viết ra rõ ràng danh sách trạng thái và tổng số rule kích hoạt trước
-      khi chọn recommendation, theo đúng định dạng:
-         "RR-003: [KÍCH HOẠT/KHÔNG] | RR-002: [KÍCH HOẠT/KHÔNG] | RR-006: [KÍCH HOẠT/KHÔNG]
-          -> Số rule kích hoạt: X/3"
-      KHÔNG được chọn recommendation trước rồi mới viết dòng này để biện minh —
-      dòng này phải được viết TRƯỚC, sau đó mới tra bảng ở BƯỚC 3.
+      BƯỚC 2: Viết ra: "RR-003: [X] | RR-002: [X] | RR-006: [X] -> Số rule kích hoạt: N/3"
+      (viết TRƯỚC khi chọn recommendation, không chọn trước rồi biện minh sau).
     
-      BƯỚC 3 - Tra ĐÚNG bảng sau theo số X/3 đã đếm ở Bước 2, đây là CĂN CỨ DUY NHẤT
-      để chọn recommendation (không dùng thêm bất kỳ tiêu chí định tính nào khác
-      như "rủi ro lớn", "chỉ số không quá thấp", "đạt chuẩn"...):
+      BƯỚC 3: Tra bảng (căn cứ DUY NHẤT, không dùng thêm tiêu chí định tính khác):
+         N=0 -> ACCEPT
+         N=1 hoặc 2 -> CONDITIONAL_ACCEPT
+         N=3 -> REJECT
     
-         X = 0/3  -> ACCEPT
-         X = 1/3  -> CONDITIONAL_ACCEPT
-         X = 2/3  -> CONDITIONAL_ACCEPT
-         X = 3/3  -> REJECT
+      Giọng văn "rủi ro nghiêm trọng" trong risk_summary/three_reasons chỉ mô tả mức
+      độ, KHÔNG được dùng để đổi recommendation khác với bảng trên.
     
-      Định nghĩa diễn giải (CHỈ dùng để viết executive_summary cho tự nhiên, KHÔNG
-      được dùng để tự quyết định recommendation khác với bảng ở Bước 3):
-         + ACCEPT: toàn bộ chỉ số tài chính đạt chuẩn, không rule nào kích hoạt.
-         + CONDITIONAL_ACCEPT: dự án khả thi nhưng cần ràng buộc/kiểm soát rủi ro
-           hoặc đàm phán lại một số điều khoản, do có 1 hoặc 2 rule kích hoạt.
-         + REJECT: cả 3 rule (RR-003, RR-002, RR-006) đồng thời kích hoạt.
-         + NEED_MORE_DATA: do thiếu dữ liệu đầu vào (missing_fields không rỗng),
-           không liên quan đến số rule kích hoạt.
-    
-      TUYỆT ĐỐI KHÔNG được chọn REJECT nếu X khác 3/3.
-      TUYỆT ĐỐI KHÔNG được chọn ACCEPT nếu X khác 0/3.
-      three_reasons và risk_summary (ở Risk Agent) chỉ mô tả MỨC ĐỘ NGHIÊM TRỌNG
-      bằng ngôn ngữ tự nhiên (ví dụ "vi phạm rất nghiêm trọng"), KHÔNG được dùng
-      giọng văn đó làm căn cứ thay đổi recommendation — căn cứ DUY NHẤT là bảng ở
-      Bước 3.
-    
-      VÍ DỤ THAM CHIẾU (bắt buộc dùng làm mẫu suy luận, bao phủ đủ 4 trường hợp):
-    
-        - missing_fields = ["revenue_forecast"]
-          -> recommendation = NEED_MORE_DATA (dừng ngay ở Bước 0, không cần đếm rule)
-    
-        - gross_margin = 30%, min_projected_closing_cash = 700 triệu, confidence_score = 80%
-          -> RR-003: KHÔNG | RR-002: KHÔNG | RR-006: KHÔNG (vì RR-002 không kích hoạt)
-          -> Số rule kích hoạt: 0/3 -> ACCEPT
-    
-        - gross_margin = 19.4%, min_projected_closing_cash = -78 triệu, confidence_score = 76%
-          -> RR-003: KÍCH HOẠT | RR-002: KÍCH HOẠT | RR-006: KHÔNG (confidence 76% >= 65%)
-          -> Số rule kích hoạt: 2/3 -> CONDITIONAL_ACCEPT
-          -> KHÔNG được chọn REJECT dù risk_summary có ghi "vi phạm rất nghiêm trọng"
-    
-        - gross_margin = 15%, min_projected_closing_cash = -100 triệu, confidence_score = 50%
-          -> RR-003: KÍCH HOẠT | RR-002: KÍCH HOẠT | RR-006: KÍCH HOẠT (confidence 50% < 65%)
-          -> Số rule kích hoạt: 3/3 -> REJECT
+      Ví dụ: gross_margin=19.4%, cash=-78tr, confidence=76%
+      -> RR-003: KH | RR-002: KH | RR-006: Không (confidence >=65%) -> 2/3 -> CONDITIONAL_ACCEPT
+      (không REJECT dù risk_summary ghi "vi phạm rất nghiêm trọng")
+      
 - EXECUTIVE SUMMARY bắt buộc là nhận xét đánh giá đối với gói vay chứ không liên
   quan gì đến khách hàng. Phải đánh giá gói vay đang được đề xuất, không tự động
   lấy gói vay khác.
