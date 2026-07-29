@@ -1161,19 +1161,12 @@ Quy tắc bắt buộc:
 
 - Viết bằng tiếng Việt, rõ ràng và bảo vệ được khi vấn đáp.
 
-- Quy tắc recommendation — PHẢI đếm số rule bị KÍCH HOẠT trong 3 rule ở trên
-  (RR-003, RR-002, RR-006) trước khi chọn, theo đúng bảng sau, không được tự
-  suy đoán ngoài bảng:
-
-    + missing_fields KHÔNG rỗng -> NEED_MORE_DATA (bất kể các rule khác thế nào).
-    + missing_fields RỖNG VÀ 0/3 rule kích hoạt -> ACCEPT.
-    + missing_fields RỖNG VÀ (1/3 hoặc 2/3) rule kích hoạt -> CONDITIONAL_ACCEPT.
-    + missing_fields RỖNG VÀ 3/3 rule kích hoạt (RR-003 VÀ RR-002 VÀ RR-006 đồng
-      thời) -> REJECT.
-
-  TUYỆT ĐỐI KHÔNG được chọn REJECT nếu không đủ cả 3/3. TUYỆT ĐỐI KHÔNG được
-  chọn ACCEPT nếu có bất kỳ rule nào kích hoạt. Trước khi chốt, tự kiểm tra lại
-  số rule kích hoạt đã đếm ở trên có khớp với recommendation sắp đưa ra không.
+- Quy tắc khi đưa ra recommendation: 
+    + ACCEPT: Chấp nhận hoàn toàn đề xuất (khi các chỉ số tài chính đạt chuẩn, không có rủi ro lớn và dữ liệu đầy đủ).
+    + CONDITIONAL_ACCEPT: Chấp nhận có điều kiện (khi dự án có thể thực hiện nhưng đi kèm các yêu cầu ràng buộc, biện pháp kiểm soát rủi ro hoặc cần đàm phán lại một số điều khoản như biên lợi nhuận). Các chỉ số không quá thấp đối với ngưỡng yêu cầu của cái Risk rule.
+    + REJECT: Từ chối đề xuất khi tất cả các chỉ số bao gồm: gross margin < 0.28, closing cash < 550tr, confidence score < 0.65 đồng thời xảy ra thì mới kích hoạt Reject. Nếu không đồng thời xảy ra bắt buộc không được kích hoạt reject.
+    + NEED_MORE_DATA: Chỉ kích hoạt khi có thông tin đầu vào thiếu. Còn lại không được phép kích hoạt. 
+ LƯU Ý QUAN TRỌNG :Trước khi chốt, tự kiểm tra lại số rule kích hoạt đã đếm ở trên có khớp với recommendation sắp đưa ra không.
 """
     return call_structured_agent(client, model, instructions, payload, DecisionAgentOutput)
 
