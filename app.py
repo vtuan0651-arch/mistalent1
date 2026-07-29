@@ -1039,76 +1039,6 @@ Quy tắc bắt buộc:
     return call_structured_agent(client, model, instructions, payload, DecisionAgentOutput)
 
 
-def build_protection_condition(
-    triggered_rule_ids: list[str],
-    is_new_customer: bool = False,
-    has_financing: bool = True,
-) -> str:
-    """
-    Sinh "Điều kiện bảo vệ" TẤT ĐỊNH theo đúng tổ hợp risk rule đã kích hoạt.
-
-    Lý do: nếu để OpenAI tự do viết, cùng một payload (cùng triggered_rule_ids) vẫn
-    cho ra điều kiện bảo vệ khác nhau mỗi lần chạy (đã quan sát thấy trong thực tế:
-    3 lần chạy cùng input ra 3 điều kiện hoàn toàn khác nhau) — mất tính tái lập và
-    kiểm chứng được, vốn bắt buộc với một cam kết mà Founder phải xác nhận. Ưu tiên
-    rule nghiêm trọng nhất: RR-006 (thiếu tin cậy dữ liệu) > RR-002 (rủi ro thanh
-    khoản) > RR-003 (biên lợi nhuận thấp).
-
-    has_financing: True nếu có ít nhất 1 sản phẩm tín dụng eligible=True được chọn
-    (selected_financing_option khác "Không cần huy động vốn ngoài"). Khi RR-002 kích
-    hoạt nhưng KHÔNG có gói vay nào khả thi (has_financing=False), điều kiện bảo vệ
-    KHÔNG được nói về "giải ngân" — vì không có khoản vay nào để giải ngân — mà phải
-    hướng về đàm phán lại tiến độ thanh toán/đặt cọc với chính khách hàng của hợp
-    đồng này, đúng như hướng xử lý duy nhất còn lại khi thị trường tín dụng không
-    khả thi.
-    """
-    ids = set(triggered_rule_ids)
-
-    if "RR-006" in ids:
-        if is_new_customer:
-            # Khách hàng MỚI không thể có "lịch sử giao dịch" với OPC — yêu cầu bổ
-            # sung phải là những thứ họ THỰC SỰ có thể cung cấp, không lặp lại yêu
-            # cầu bất khả thi (bổ sung lịch sử giao dịch chưa từng tồn tại).
-            return (
-                "Khách hàng mới (chưa có lịch sử giao dịch với OPC) cần bổ sung giấy tờ "
-                "pháp lý (đăng ký kinh doanh/hộ kinh doanh), tài sản đảm bảo hoặc người/"
-                "đơn vị bảo lãnh thanh toán, và nên yêu cầu đặt cọc hoặc thanh toán một "
-                "phần trước khi triển khai để bù đắp việc chưa đủ dữ liệu tin cậy; nếu "
-                "không đáp ứng, Founder có quyền từ chối hoặc tạm dừng đề xuất tài chính."
-            )
-        return (
-            "Khách hàng phải bổ sung minh chứng dữ liệu tín dụng còn thiếu (lịch sử "
-            "giao dịch, tài sản đảm bảo/bảo lãnh thanh toán) trước khi giải ngân bất kỳ "
-            "khoản nào; nếu không bổ sung đủ trong thời hạn thỏa thuận, Founder có quyền "
-            "từ chối hoặc tạm dừng đề xuất tài chính."
-        )
-    if "RR-002" in ids:
-        if not has_financing:
-            # Không có sản phẩm tín dụng nào eligible -> không có khoản vay nào để
-            # "giải ngân". Hướng xử lý duy nhất còn lại: đàm phán lại tiến độ thanh
-            # toán/đặt cọc với khách hàng của hợp đồng này để tự cải thiện dòng tiền.
-            return (
-                "Không có sản phẩm tín dụng nào khả thi để bù đắp thâm hụt dòng tiền — "
-                "Founder cần đàm phán lại với khách hàng để nhận đặt cọc hoặc thanh toán "
-                "trước một phần, đồng thời triển khai hợp đồng theo tiến độ từng giai "
-                "đoạn (phase delivery) gắn với xác nhận thanh toán ở mỗi giai đoạn, để "
-                "dòng tiền dự phòng của công ty không giảm dưới ngưỡng tối thiểu; nếu "
-                "khách hàng không đồng ý điều chỉnh tiến độ thanh toán, Founder cần cân "
-                "nhắc từ chối hoặc hoãn triển khai hợp đồng."
-            )
-        return (
-            "Thực hiện vay vốn hoặc triển khai hợp đồng theo tiến độ từng giai đoạn (phase delivery), "
-            "gắn với xác nhận thanh toán của khách hàng ở mỗi giai đoạn, để bảo vệ dòng "
-            "tiền dự phòng của công ty không giảm dưới ngưỡng tối thiểu."
-        )
-    if "RR-003" in ids:
-        return (
-            "Đàm phán lại chi phí vận hành hoặc điều chỉnh giá dịch vụ trước khi ký hợp "
-            "đồng, để đưa biên lợi nhuận gộp về trên ngưỡng an toàn 28%."
-        )
-    return "Không có điều kiện bảo vệ đặc biệt — theo dõi định kỳ theo quy trình chuẩn."
-
-
 def enforce_decision_card(
     decision_result: DecisionAgentOutput,
     finance_metrics: dict,
@@ -1121,7 +1051,7 @@ def enforce_decision_card(
     is_new_customer: bool = False,
 ) -> DecisionAgentOutput:
     """
-    Ép các trường ĐỊNH LƯỢNG + "protection_condition" của Decision Card về đúng giá
+    Ép các trường ĐỊNH LƯỢNG  của Decision Card về đúng giá
     trị/logic Python đã tính tất định.
 
     Lý do: hướng dẫn trong prompt ("PHẢI lấy đúng giá trị Python cung cấp, không tự
@@ -1160,9 +1090,6 @@ def enforce_decision_card(
             ),
             "selected_financing_option": enforced_option,
             "funding_amount": enforced_funding_amount,
-            "protection_condition": build_protection_condition(
-                triggered_rule_ids, is_new_customer, has_financing=bool(eligible_options)
-            ),
             "human_approval_required": enforced_human_approval,
         }
     )
