@@ -376,7 +376,7 @@ def compute_oper_coefficient(
 
     Ghi chú: Uy tín thanh toán (Payment Reliability) và Áp lực tiến độ giao hàng
     (Urgent Delivery) đã được thay thế bằng một hệ số rủi ro con người CỐ ĐỊNH
-    +4.0%, luôn được cộng vào Oper bất kể payment_reliability / thời hạn hợp đồng.
+    +1.0%, luôn được cộng vào Oper bất kể payment_reliability / thời hạn hợp đồng.
 
     num_provinces: quy mô triển khai dự án (số tỉnh thành), nhập thủ công ở Input Data.
     """
@@ -384,12 +384,12 @@ def compute_oper_coefficient(
     breakdown = []
 
     # Hệ số rủi ro con người (Human Risk Factor) — cố định, luôn áp dụng.
-    oper += 0.04
-    breakdown.append({"tieu_chi": "Rủi ro con người (Human Risk Factor - cố định)", "he_so": 0.04})
+    oper += 0.01
+    breakdown.append({"tieu_chi": "Rủi ro con người (Human Risk Factor - cố định)", "he_so": 0.01})
 
     if province is not None and not is_core_city(province):
-        oper += 0.03
-        breakdown.append({"tieu_chi": f"Mở rộng địa bàn ({province})", "he_so": 0.03})
+        oper += 0.02
+        breakdown.append({"tieu_chi": f"Mở rộng địa bàn ({province})", "he_so": 0.02})
 
     if transaction_risk_score is not None and transaction_risk_score > 85:
         oper += 0.04
