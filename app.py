@@ -2458,22 +2458,15 @@ with tab_dashboard:
             st.markdown('<div class="dash-section-title dash-container"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: #ef4444;"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg> Quản trị Rủi ro</div>', unsafe_allow_html=True)
             
             risk_level = risk_result["risk_level"]
-            if risk_level in {"CRITICAL", "HIGH"}:
-                st.error(f"🚨 **Risk Level: {risk_level}**\n\nCần đặc biệt lưu ý và kiểm soát nghiêm ngặt.")
-            elif risk_level == "MEDIUM":
-                st.warning(f"⚠️ **Risk Level: {risk_level}**\n\nRủi ro có thể chấp nhận nếu tuân thủ điều kiện bảo vệ.")
-            else:
-                st.success(f"✅ **Risk Level: {risk_level}**\n\nHợp đồng ở ngưỡng an toàn.")
-
             risk_summary = build_risk_summary_message(
                 decision["gross_margin"], cash_projection["min_projected_closing_cash"]
             )
-            if risk_summary["level"] == "CRITICAL":
-                st.error(f"🚨 **Risk Summary:** {risk_summary['message']}")
-            elif risk_summary["level"] == "WARNING":
-                st.warning(f"⚠️ **Risk Summary:** {risk_summary['message']}")
+            if risk_level in {"CRITICAL", "HIGH"}:
+                st.error(f"🚨 **Risk Level: {risk_level}**\n\n{risk_summary['message']}")
+            elif risk_level == "MEDIUM":
+                st.warning(f"⚠️ **Risk Level: {risk_level}**\n\n{risk_summary['message']}")
             else:
-                st.success(f"✅ **Risk Summary:** {risk_summary['message']}")
+                st.success(f"✅ **Risk Level: {risk_level}**\n\n{risk_summary['message']}")
                 
             st.markdown(f"""
 <div class="dash-container" style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 16px; padding: 20px; margin-top: 20px; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(251, 191, 36, 0.1);">
