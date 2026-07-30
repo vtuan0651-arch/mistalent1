@@ -384,12 +384,12 @@ def compute_oper_coefficient(
     breakdown = []
 
     # Hệ số rủi ro con người (Human Risk Factor) — cố định, luôn áp dụng.
-    oper += 0.01
-    breakdown.append({"tieu_chi": "Rủi ro con người (Human Risk Factor - cố định)", "he_so": 0.01})
+    oper += 0.04
+    breakdown.append({"tieu_chi": "Rủi ro con người (Human Risk Factor - cố định)", "he_so": 0.04})
 
     if province is not None and not is_core_city(province):
-        oper += 0.01 
-        breakdown.append({"tieu_chi": f"Mở rộng địa bàn ({province})", "he_so": 0.01})
+        oper += 0.03
+        breakdown.append({"tieu_chi": f"Mở rộng địa bàn ({province})", "he_so": 0.03})
 
     if transaction_risk_score is not None and transaction_risk_score > 85:
         oper += 0.04
@@ -685,7 +685,6 @@ def evaluate_risk_rules(
     finance_metrics: dict,
     cash_projection: dict,
     confidence_result: Optional[dict],
-    partner_matrix: list[dict],
 ) -> dict:
     rules = data["13_RISK_RULES"]
     rule_lookup = {str(r["rule_id"]): r for _, r in rules.iterrows()}
@@ -740,6 +739,7 @@ def evaluate_risk_rules(
         risk_level = "MEDIUM"
     else:
         risk_level = "LOW"
+
     return {"triggered_rules": triggered, "risk_level": risk_level}
 
 
@@ -984,7 +984,7 @@ Nhiệm vụ:
 Quy tắc bắt buộc:
 - Không tự tạo thêm risk rule ngoài triggered_rules được cung cấp.
 - Không tuyên bố đã đánh giá rủi ro không có trong triggered_rules.
-- risk_level đánh giá dựa trên Triggered Risk Rules. LƯU Ý: Nếu {gross_margin} < 0.16  thì Risk level bắt buộc hiển thị là CRITICAL.
+- risk_level phải khớp với risk_level đã được Python tính (dùng lại nguyên giá trị). Đưa ra tất cả các giá trị risk level đang xuất hiện.  
 - Nếu missing_fields không rỗng, phải nêu yêu cầu bổ sung dữ liệu.
 - Viết bằng tiếng Việt, ngắn gọn và có thể hành động.
 """
@@ -1012,23 +1012,24 @@ Quy tắc bắt buộc:
   không tự tính lại.
 - Chỉ chọn phương án tài chính có eligible=true trong partner_matrix; nếu partner_matrix
   rỗng (không cần vay), selected_financing_option phải nêu rõ "Không cần huy động vốn ngoài".
-- Nếu requested_amount > 300,000,000 VND: Hiển thị thông tin sau: 'Số tiền cần vay vốn lớn hơn 300 triệu VND. Yêu cầu Founder phê duyệt'. CẢNH BÁO CHỈ HIỂN THỊ KHI requested_amount > 300 còn lại bắt buộc không được hiển thị Cảnh báo. 
+- Nếu requested_amount > 300,000,000 VND: human_approval_required=true (RR-005, Founder phê duyệt).
 - Không phát minh sản phẩm, lãi suất hoặc hạn mức ngoài dữ liệu được cung cấp.
 - three_reasons phải có chính xác 3 phần tử, MỖI phần tử đánh giá đúng 1 trong 3 chỉ số
   bắt buộc theo thứ tự cố định:
       (1) Đánh giá gross margin: lấy gross margin được tính toán ở trên, không được tự nghĩ ra số liệu hay tự ý thay đổi số liệu. 
           - Nếu gross margin < 0.28: Nội dung bắt buộc sinh ra: "Chỉ số Gross Margin hiện tại là {gross_margin}, bé hơn mức tiêu chuẩn 0.28 (Kích hoạt RR-003). Điều này sẽ ảnh hưởng trực tiếp đến khả năng tài chính của OPC, do đó bắt buộc phải tiến hành đàm phán lại với khách hàng."
           - Nếu gross margin > 0.28: Nội dung bắt buộc sinh ra: "Chỉ số Gross Margin hiện tại là {gross_margin}, lớn hơn hoặc bằng mức tiêu chuẩn 0.28. Mức biên lợi nhuận này đang ở trạng thái an toàn."
-      (2) Đánh giá min_projected_closing_cash: lấy min_projected_closing_cash được tính toán ở trên, không được tự nghĩ ra số liệu hay tự ý thay đổi số liệu. 
-          - Nếu min_projected_closing_cash < 550 triệu: Nội dung bắt buộc sinh ra: "Projected Closing Cash hiện tại là {min_projected_closing_cash}, bé hơn mốc an toàn 550 triệu VND (Kích hoạt RR-002). Dự án đang có rủi ro về khả năng thanh khoản."
-          - Nếu min_projected_closing_cash > 550 triệu: Nội dung bắt buộc sinh ra: "Projected Closing Cash hiện tại là {min_projected_closing_cash}, lớn hơn hoặc bằng mốc 550 triệu VND. Khả năng thanh khoản của dự án được đảm bảo."
+      (2) Đánh giá closing cash: lấy closing cash được tính toán ở trên, không được tự nghĩ ra số liệu hay tự ý thay đổi số liệu. 
+          - Nếu closing cash < 550 triệu: Nội dung bắt buộc sinh ra: "Projected Closing Cash hiện tại là {min_closing_cash}, bé hơn mốc an toàn 550 triệu VND (Kích hoạt RR-002). Dự án đang có rủi ro về khả năng thanh khoản."
+          - Nếu closing cash > 550 triệu: Nội dung bắt buộc sinh ra: "Projected Closing Cash hiện tại là {min_closing_cash}, lớn hơn hoặc bằng mốc 550 triệu VND. Khả năng thanh khoản của dự án được đảm bảo."
       (3) Đánh giá confidence score: 
           - Nếu confidence_score < 0.65 :Nội dung bắt buộc sinh ra: "Confidence Score hiện tại là {confidence_score}, bé hơn mức 0.65 (Kích hoạt RR-006 do RR-002 đã cảnh báo). Mức độ tin cậy của dữ liệu dự phóng thấp, cần rà soát lại đầu vào."
           - Nếu confidence_score > 0.65: "Confidence Score hiện tại là {confidence_score} (Không kích hoạt RR-006). Mức độ tin cậy của dữ liệu ở mức cao hơn 65% và có thể chấp nhận để ra quyết định."
       Mỗi lý do phải nêu rõ số liệu cụ thể (giá trị chỉ số) và rule liên quan nếu có kích hoạt, không được viết chung chung hay gộp nhiều chỉ số vào 1 lý do.
       LƯU Ý: bắt buộc phải lấy đúng các chỉ số gross margin, closing cash, confidence score Ở TRÊN. Không được bịa chỉ số đầu vào, không lấy từ ngoài. 
-- protection_condition phải đánh giá dựa trên {gross_margin},{min_closing_cash},{confidence_score}. Đưa ra một điều kiện thương mại hoặc kiểm soát cụ thể cần Founder xác nhận.
+- protection_condition phải là một điều kiện thương mại hoặc kiểm soát cụ thể cần Founder xác nhận.
 - Viết bằng tiếng Việt, rõ ràng và bảo vệ được khi vấn đáp.
+- So sánh đúng requested_amount > 300tr mới cần Founder phê duyệt.
 - Quy tắc khi đưa ra recommendation: 
     + ACCEPT: Chấp nhận hoàn toàn đề xuất (khi các chỉ số tài chính đạt chuẩn, không có rủi ro lớn và dữ liệu đầy đủ).
     + CONDITIONAL_ACCEPT: Chấp nhận có điều kiện (khi dự án có thể thực hiện nhưng đi kèm các yêu cầu ràng buộc, biện pháp kiểm soát rủi ro hoặc cần đàm phán lại một số điều khoản như biên lợi nhuận). Các chỉ số không quá thấp đối với ngưỡng yêu cầu của cái Risk rule.
@@ -1036,6 +1037,76 @@ Quy tắc bắt buộc:
     + NEED_MORE_DATA: Chỉ kích hoạt khi có thông tin đầu vào thiếu. Còn lại không được phép kích hoạt. 
 """
     return call_structured_agent(client, model, instructions, payload, DecisionAgentOutput)
+
+
+def build_protection_condition(
+    triggered_rule_ids: list[str],
+    is_new_customer: bool = False,
+    has_financing: bool = True,
+) -> str:
+    """
+    Sinh "Điều kiện bảo vệ" TẤT ĐỊNH theo đúng tổ hợp risk rule đã kích hoạt.
+
+    Lý do: nếu để OpenAI tự do viết, cùng một payload (cùng triggered_rule_ids) vẫn
+    cho ra điều kiện bảo vệ khác nhau mỗi lần chạy (đã quan sát thấy trong thực tế:
+    3 lần chạy cùng input ra 3 điều kiện hoàn toàn khác nhau) — mất tính tái lập và
+    kiểm chứng được, vốn bắt buộc với một cam kết mà Founder phải xác nhận. Ưu tiên
+    rule nghiêm trọng nhất: RR-006 (thiếu tin cậy dữ liệu) > RR-002 (rủi ro thanh
+    khoản) > RR-003 (biên lợi nhuận thấp).
+
+    has_financing: True nếu có ít nhất 1 sản phẩm tín dụng eligible=True được chọn
+    (selected_financing_option khác "Không cần huy động vốn ngoài"). Khi RR-002 kích
+    hoạt nhưng KHÔNG có gói vay nào khả thi (has_financing=False), điều kiện bảo vệ
+    KHÔNG được nói về "giải ngân" — vì không có khoản vay nào để giải ngân — mà phải
+    hướng về đàm phán lại tiến độ thanh toán/đặt cọc với chính khách hàng của hợp
+    đồng này, đúng như hướng xử lý duy nhất còn lại khi thị trường tín dụng không
+    khả thi.
+    """
+    ids = set(triggered_rule_ids)
+
+    if "RR-006" in ids:
+        if is_new_customer:
+            # Khách hàng MỚI không thể có "lịch sử giao dịch" với OPC — yêu cầu bổ
+            # sung phải là những thứ họ THỰC SỰ có thể cung cấp, không lặp lại yêu
+            # cầu bất khả thi (bổ sung lịch sử giao dịch chưa từng tồn tại).
+            return (
+                "Khách hàng mới (chưa có lịch sử giao dịch với OPC) cần bổ sung giấy tờ "
+                "pháp lý (đăng ký kinh doanh/hộ kinh doanh), tài sản đảm bảo hoặc người/"
+                "đơn vị bảo lãnh thanh toán, và nên yêu cầu đặt cọc hoặc thanh toán một "
+                "phần trước khi triển khai để bù đắp việc chưa đủ dữ liệu tin cậy; nếu "
+                "không đáp ứng, Founder có quyền từ chối hoặc tạm dừng đề xuất tài chính."
+            )
+        return (
+            "Khách hàng phải bổ sung minh chứng dữ liệu tín dụng còn thiếu (lịch sử "
+            "giao dịch, tài sản đảm bảo/bảo lãnh thanh toán) trước khi giải ngân bất kỳ "
+            "khoản nào; nếu không bổ sung đủ trong thời hạn thỏa thuận, Founder có quyền "
+            "từ chối hoặc tạm dừng đề xuất tài chính."
+        )
+    if "RR-002" in ids:
+        if not has_financing:
+            # Không có sản phẩm tín dụng nào eligible -> không có khoản vay nào để
+            # "giải ngân". Hướng xử lý duy nhất còn lại: đàm phán lại tiến độ thanh
+            # toán/đặt cọc với khách hàng của hợp đồng này để tự cải thiện dòng tiền.
+            return (
+                "Không có sản phẩm tín dụng nào khả thi để bù đắp thâm hụt dòng tiền — "
+                "Founder cần đàm phán lại với khách hàng để nhận đặt cọc hoặc thanh toán "
+                "trước một phần, đồng thời triển khai hợp đồng theo tiến độ từng giai "
+                "đoạn (phase delivery) gắn với xác nhận thanh toán ở mỗi giai đoạn, để "
+                "dòng tiền dự phòng của công ty không giảm dưới ngưỡng tối thiểu; nếu "
+                "khách hàng không đồng ý điều chỉnh tiến độ thanh toán, Founder cần cân "
+                "nhắc từ chối hoặc hoãn triển khai hợp đồng."
+            )
+        return (
+            "Thực hiện vay vốn hoặc triển khai hợp đồng theo tiến độ từng giai đoạn (phase delivery), "
+            "gắn với xác nhận thanh toán của khách hàng ở mỗi giai đoạn, để bảo vệ dòng "
+            "tiền dự phòng của công ty không giảm dưới ngưỡng tối thiểu."
+        )
+    if "RR-003" in ids:
+        return (
+            "Đàm phán lại chi phí vận hành hoặc điều chỉnh giá dịch vụ trước khi ký hợp "
+            "đồng, để đưa biên lợi nhuận gộp về trên ngưỡng an toàn 28%."
+        )
+    return "Không có điều kiện bảo vệ đặc biệt — theo dõi định kỳ theo quy trình chuẩn."
 
 
 def enforce_decision_card(
@@ -1050,7 +1121,7 @@ def enforce_decision_card(
     is_new_customer: bool = False,
 ) -> DecisionAgentOutput:
     """
-    Ép các trường ĐỊNH LƯỢNG  của Decision Card về đúng giá
+    Ép các trường ĐỊNH LƯỢNG + "protection_condition" của Decision Card về đúng giá
     trị/logic Python đã tính tất định.
 
     Lý do: hướng dẫn trong prompt ("PHẢI lấy đúng giá trị Python cung cấp, không tự
@@ -1089,6 +1160,9 @@ def enforce_decision_card(
             ),
             "selected_financing_option": enforced_option,
             "funding_amount": enforced_funding_amount,
+            "protection_condition": build_protection_condition(
+                triggered_rule_ids, is_new_customer, has_financing=bool(eligible_options)
+            ),
             "human_approval_required": enforced_human_approval,
         }
     )
@@ -1779,7 +1853,6 @@ with tab_ops:
                             finance_metrics=finance_metrics,
                             cash_projection=cash_projection,
                             confidence_result=confidence_result,
-                            partner_matrix=partner_matrix,
                         )
 
                         client = OpenAI(api_key=api_key)
@@ -2361,10 +2434,8 @@ with tab_dashboard:
             st.markdown('<div class="dash-section-title dash-container"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: #ef4444;"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg> Quản trị Rủi ro</div>', unsafe_allow_html=True)
             
             risk_level = risk_result["risk_level"]
-            if risk_level == "CRITICAL":
-                st.error("🚨 **Risk Level: CRITICAL**\n\n🚨 Mức độ cực kỳ nguy hiểm! Cần đánh giá chuyên sâu trước khi thực hiện.")
-            elif risk_level == "HIGH":
-                st.error("⚠️ **Risk Level: HIGH**\n\nCần đặc biệt lưu ý và kiểm soát nghiêm ngặt.")
+            if risk_level in {"CRITICAL", "HIGH"}:
+                st.error(f"🚨 **Risk Level: {risk_level}**\n\nCần đặc biệt lưu ý và kiểm soát nghiêm ngặt.")
             elif risk_level == "MEDIUM":
                 st.warning(f"⚠️ **Risk Level: {risk_level}**\n\nRủi ro có thể chấp nhận nếu tuân thủ điều kiện bảo vệ.")
             else:
