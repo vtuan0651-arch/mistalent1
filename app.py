@@ -743,6 +743,30 @@ def evaluate_risk_rules(
     return {"triggered_rules": triggered, "risk_level": risk_level}
 
 
+def build_risk_summary_message(gross_margin: float, min_closing_cash: float) -> dict:
+    """Risk Summary (thuần Python, tách biệt với RR-002/RR-003):
+    - Đồng thời gross_margin < 20% VÀ min_projected_closing_cash < 0
+      -> "Vi phạm nghiêm trọng các yêu cầu về biên lợi nhuận và dòng tiền dự trữ"
+    - Chỉ MỘT trong hai điều kiện trên xảy ra
+      -> "Xem xét lại khả năng thanh khoản và biên lợi nhuận"
+    - Không điều kiện nào xảy ra -> an toàn.
+    """
+    gm_breach = gross_margin < 0.20
+    cash_breach = min_closing_cash < 0
+
+    if gm_breach and cash_breach:
+        level = "CRITICAL"
+        message = "Vi phạm nghiêm trọng các yêu cầu về biên lợi nhuận và dòng tiền dự trữ"
+    elif gm_breach or cash_breach:
+        level = "WARNING"
+        message = "Xem xét lại khả năng thanh khoản và biên lợi nhuận"
+    else:
+        level = "OK"
+        message = "Biên lợi nhuận và dòng tiền dự trữ đều trong ngưỡng an toàn."
+
+    return {"level": level, "message": message, "gm_breach": gm_breach, "cash_breach": cash_breach}
+
+
 # ============================================================
 # 6. TÁC NHÂN 3 — DECISION & PARTNER AGENT
 # ============================================================
@@ -2440,6 +2464,16 @@ with tab_dashboard:
                 st.warning(f"⚠️ **Risk Level: {risk_level}**\n\nRủi ro có thể chấp nhận nếu tuân thủ điều kiện bảo vệ.")
             else:
                 st.success(f"✅ **Risk Level: {risk_level}**\n\nHợp đồng ở ngưỡng an toàn.")
+
+            risk_summary = build_risk_summary_message(
+                decision["gross_margin"], cash_projection["min_projected_closing_cash"]
+            )
+            if risk_summary["level"] == "CRITICAL":
+                st.error(f"🚨 **Risk Summary:** {risk_summary['message']}")
+            elif risk_summary["level"] == "WARNING":
+                st.warning(f"⚠️ **Risk Summary:** {risk_summary['message']}")
+            else:
+                st.success(f"✅ **Risk Summary:** {risk_summary['message']}")
                 
             st.markdown(f"""
 <div class="dash-container" style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 16px; padding: 20px; margin-top: 20px; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(251, 191, 36, 0.1);">
