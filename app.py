@@ -583,8 +583,10 @@ def project_closing_cash(
 
 # ---- Confidence Score (CS = 0.4*Eliscore + 0.6*Completeness_Score) ----
 #
-# Chỉ tính Confidence Score SAU KHI đã lọc 3 lớp sản phẩm ngân hàng (account_ops /
-# credit_guarantee / unclassified bị loại) và thu được ÍT NHẤT một gói vay phù hợp
+# Chỉ tính Confidence Score SAU KHI đã lọc 4 lớp sản phẩm ngân hàng (Lớp 1 —
+# account_ops / credit_guarantee / unclassified bị loại; Lớp 2 — Min Funding;
+# Lớp 3 — so sánh tổng chi phí; Lớp 4 — ràng buộc tài sản đảm bảo) và thu được
+# ÍT NHẤT một gói vay phù hợp
 # (eligible=True trong partner_matrix). Nếu không có đề xuất gói vay nào, trả về None
 # — giữ đúng logic hiện tại (không tính Confidence Score khi không có đề xuất tài trợ).
 #
@@ -647,7 +649,7 @@ def compute_confidence_score(
     funding_amount: float,
     province: Optional[str],
 ) -> Optional[dict]:
-    """Chỉ tính Confidence Score khi (sau khi lọc 3 lớp) có ít nhất một gói vay
+    """Chỉ tính Confidence Score khi (sau khi lọc 4 lớp) có ít nhất một gói vay
     eligible trong partner_matrix — tức là đã có đề xuất gói vay phù hợp."""
     eligible_options = [item for item in partner_matrix if item.get("eligible")]
     if not eligible_options:
@@ -790,7 +792,8 @@ BANK_PRODUCT_CREDIT_GUARANTEE_KEYWORDS = [
 
 
 def classify_bank_product(product_name: str, description: str) -> tuple[str, str]:
-    """Phân loại 1 sản phẩm 11_BANK_PRODUCTS theo bản chất, trả về (category, lý do).
+    """LỚP 1 — Loại gói tín dụng: xác định nhu cầu vay.
+    Phân loại 1 sản phẩm 11_BANK_PRODUCTS theo bản chất, trả về (category, lý do).
 
     - "account_ops": dịch vụ vận hành tài khoản (không phải khoản vay) -> LOẠI khỏi
       so sánh gói vay dưới mọi trường hợp.
@@ -842,14 +845,27 @@ def build_partner_matrix(
     funding_need: float,
     cash_projection: dict,
 ) -> list[dict]:
-    """Chỉ truy xuất 11_BANK_PRODUCTS khi Projected_Closing_Cash < 550 triệu VND.
-    So sánh các gói TÍN DỤNG BƠM TIỀN MẶT TRỰC TIẾP (category="credit_cash") —
-    không lọc theo target_segment/customer_type, nhưng loại bỏ:
+    """Cơ chế Lọc 4 Lớp Quản trị Vốn (chỉ truy xuất 11_BANK_PRODUCTS khi
+    Projected_Closing_Cash < 550 triệu VND):
+
+    LỚP 1 — Loại gói tín dụng: xác định nhu cầu vay. Chỉ giữ lại các gói TÍN DỤNG
+    BƠM TIỀN MẶT TRỰC TIẾP (category="credit_cash"); không lọc theo
+    target_segment/customer_type, nhưng loại bỏ:
       (1) dịch vụ vận hành tài khoản (account_ops) — không phải khoản vay;
       (2) sản phẩm tín dụng bảo lãnh/hỗ trợ giao dịch (credit_guarantee) — không
           bơm tiền mặt trực tiếp nên sai mục đích so với nhu cầu bù đắp RR-002;
       (3) sản phẩm chưa phân loại được (unclassified) — không tự đoán, xem
-          classify_all_bank_products() để Founder tự rà soát."""
+          classify_all_bank_products() để Founder tự rà soát.
+
+    LỚP 2 — Nhu cầu Vốn tối thiểu (Min Funding): xác định nhu cầu vốn. Một gói
+    vay chỉ eligible=True khi funding_need đạt đủ minimum_amount của gói đó.
+
+    LỚP 3 — So sánh tổng chi phí: annual_rate_or_fee + processing_fee_rate của
+    các gói vay, gói nào tổng chi phí thấp hơn được ưu tiên xếp hạng cao hơn.
+
+    LỚP 4 — Ràng buộc Tài sản Đảm bảo (Collateral): ưu tiên gói vay có
+    collateral_ratio (tỷ lệ thế chấp) thấp hơn, để xác định khả năng đảm bảo tài
+    chính của OPC — dùng làm tiêu chí phân định khi Lớp 3 bằng nhau."""
     if not cash_projection["cash_reserve_breach"]:
         return []
 
@@ -857,12 +873,14 @@ def build_partner_matrix(
 
     matrix = []
     for _, product in candidates.iterrows():
+        # LỚP 1 — Loại gói tín dụng: xác định nhu cầu vay (chỉ giữ credit_cash).
         category, _reason = classify_bank_product(
             str(product["product_name"]), str(product.get("description", ""))
         )
         if category != "credit_cash":
             continue
 
+        # LỚP 2 — Nhu cầu Vốn tối thiểu (Min Funding): xác định nhu cầu vốn.
         min_amount = float(product["minimum_amount"])
         total_cost_rate = float(product["annual_rate_or_fee"]) + float(product["processing_fee_rate"])
         # BUG cũ: "min_amount <= max(funding_need, min_amount)" luôn luôn đúng (tautology)
@@ -888,7 +906,10 @@ def build_partner_matrix(
             }
         )
 
-    # Sắp xếp: ưu tiên eligible, sau đó chi phí thấp nhất, rồi tỉ lệ bảo đảm thấp nhất.
+    # Sắp xếp: ưu tiên eligible (Lớp 2), sau đó:
+    # LỚP 3 — So sánh tổng chi phí (annual_rate_or_fee + processing_fee_rate) thấp nhất trước;
+    # LỚP 4 — Ràng buộc Tài sản Đảm bảo (Collateral): khi Lớp 3 bằng nhau, ưu tiên gói vay có
+    # collateral_ratio (tỷ lệ thế chấp) thấp hơn — xác định khả năng đảm bảo tài chính của OPC.
     matrix.sort(key=lambda item: (not item["eligible"], item["total_cost_rate"], item["collateral_ratio"]))
     return matrix
 
@@ -1843,8 +1864,10 @@ with tab_ops:
                             reserve_minimum=reserve_minimum,
                         )
 
-                        # Lọc 3 lớp sản phẩm ngân hàng (account_ops / credit_guarantee /
-                        # unclassified bị loại) và xác định gói vay đề xuất TRƯỚC KHI tính
+                        # Lọc 4 lớp sản phẩm ngân hàng (Lớp 1: loại gói tín dụng —
+                        # account_ops / credit_guarantee / unclassified bị loại; Lớp 2:
+                        # nhu cầu vốn tối thiểu; Lớp 3: so sánh tổng chi phí; Lớp 4:
+                        # ràng buộc tài sản đảm bảo) và xác định gói vay đề xuất TRƯỚC KHI tính
                         # Confidence Score, vì Confidence Score chỉ được tính khi đã có đề
                         # xuất gói vay phù hợp (partner_matrix có ít nhất 1 eligible=True).
                         partner_matrix = build_partner_matrix(
