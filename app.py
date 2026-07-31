@@ -2243,25 +2243,9 @@ st.markdown("""
         padding: 12px 36px;
         border-radius: 999px;
         box-shadow: 0 8px 30px rgba(59, 130, 246, 0.12), inset 0 2px 4px rgba(255,255,255,0.8);
-        border: 1px solid rgba(226, 232, 240, 0.9);
-        animation: floatTitle 5s ease-in-out infinite;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     " class="hero-title-box">
-        <span style="font-size: 2.2rem; animation: pulseBot 2.5s infinite; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));">🤖</span>
-        <h1 style="
-            margin: 0;
-            font-family: 'Inter', sans-serif;
-            font-size: 2rem;
-            font-weight: 900;
-            background: linear-gradient(90deg, #1e3a8a, #3b82f6, #8b5cf6, #ec4899);
-            background-size: 200% auto;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            letter-spacing: -0.02em;
-            animation: textShine 4s linear infinite;
-        ">
-            OPC Multi-Agent Contract Decision System
-        </h1>
+        <span class="hero-bot-icon" style="font-size: 2.2rem;">🤖</span>
+        <h1>OPC Multi-Agent Contract Decision System</h1>
     </div>
     <div style="
         font-family: 'Inter', sans-serif;
@@ -2299,7 +2283,19 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 with st.sidebar:
-    st.header("Cấu hình")
+    st.markdown(
+        """
+        <div class="sidebar-brand">
+            <div class="sidebar-brand-mark">O</div>
+            <div>
+                <div class="sidebar-brand-name">OPC Decision OS</div>
+                <div class="sidebar-brand-meta">Multi-agent workspace</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown('<div class="sidebar-section-label">Model configuration</div>', unsafe_allow_html=True)
     env_key = os.getenv("OPENAI_API_KEY", "")
     api_key_input = st.text_input(
         "OpenAI API key",
@@ -2312,64 +2308,28 @@ with st.sidebar:
     api_key = api_key_input.strip() or OPENAI_API_KEY_HARDCODED.strip() or env_key
     model = st.text_input(
         "Model",
-        value="gpt-5-mini",
+        value="gpt-4o-mini",
         key="model_input_v4",
-        help="Model OpenAI hỗ trợ Structured Outputs, ví dụ: gpt-5, gpt-5-mini,gpt-4o-mini, gpt-4o, gpt-4.1, gpt-4.1-mini.",
+        help="Model OpenAI hỗ trợ Structured Outputs, ví dụ: gpt-4o-mini, gpt-4o, gpt-4.1, gpt-4.1-mini.",
     )
     st.info("API key không được ghi vào Excel, prompt log hoặc Decision Card.")
 
 result = st.session_state.get("opc_result")
 
-st.markdown("""
-<style>
-/* Khung bao quanh thanh tab chính, giúp tab nổi bật và rõ ràng hơn */
-div[data-testid="stTabs"] {
-    background: #f8fafc;
-    border: 2px solid #e2e8f0;
-    border-radius: 16px;
-    padding: 10px 14px 0 14px;
-    margin-bottom: 18px;
-    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
-}
 
-div[data-testid="stTabs"] button[data-baseweb="tab"] {
-    height: 56px;
-    padding: 0 22px;
-    font-size: 1.15rem !important;
-    font-weight: 700 !important;
-    color: #475569;
-    border-radius: 10px 10px 0 0;
-}
 
-div[data-testid="stTabs"] button[data-baseweb="tab"] p {
-    font-size: 1.15rem !important;
-    font-weight: 700 !important;
-}
-
-div[data-testid="stTabs"] button[aria-selected="true"] {
-    color: #b91c1c !important;
-    background: #ffffff;
-    border-bottom: 4px solid #ef4444 !important;
-}
-
-div[data-testid="stTabs"] [data-baseweb="tab-highlight"] {
-    background-color: #ef4444 !important;
-    height: 4px !important;
-}
-
-div[data-testid="stTabs"] [data-baseweb="tab-border"] {
-    background-color: #e2e8f0 !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
-tab_ops, tab_crisis, tab_dashboard = st.tabs(["⚙️ Operations (Input & Workflow)", "🆘 Crisis Card", "🏆 Decision Dashboard"])
+tab_ops, tab_crisis, tab_dashboard = st.tabs([
+    "01  Contract analysis",
+    "02  Crisis simulation",
+    "03  Decision center",
+])
 
 with tab_ops:
     col_input, col_workflow = st.columns([1.0, 2.2], gap="large")
 
     with col_input:
-        st.subheader("1. Input Data")
+        st.markdown('<div class="section-eyebrow">INPUT</div>', unsafe_allow_html=True)
+        st.subheader("Opportunity brief")
         uploaded_file = st.file_uploader(
             "Tải Team Pack Excel",
             type=["xlsx"],
@@ -2771,7 +2731,8 @@ with tab_ops:
 
 
     with col_workflow:
-        st.subheader("2. Agent Workflow")
+        st.markdown('<div class="section-eyebrow">WORKFLOW</div>', unsafe_allow_html=True)
+        st.subheader("Agent activity")
         if not result:
             st.info("Workflow sẽ xuất hiện sau khi chạy hệ thống.")
         else:
@@ -3045,8 +3006,9 @@ CRISIS_GROUP_LABELS = {
 }
 
 with tab_crisis:
-    st.subheader("Crisis Card (MVP 1-6)")
-    st.caption("Nhập biến động để đánh giá Before/After và gọi AI chốt phương án.")
+    st.markdown('<div class="section-eyebrow">SCENARIO LAB</div>', unsafe_allow_html=True)
+    st.subheader("Crisis simulation")
+    st.caption("Mô phỏng biến động, so sánh Before/After và cập nhật phương án xử lý.")
 
     if not result:
         st.warning("Vui lòng chạy baseline ở tab Operations trước khi nhập Crisis Card.")
@@ -3436,7 +3398,8 @@ with tab_crisis:
 
 
 with tab_dashboard:
-    st.subheader("3. Decision Dashboard")
+    st.markdown('<div class="section-eyebrow">EXECUTIVE VIEW</div>', unsafe_allow_html=True)
+    st.subheader("Decision center")
     if not result:
         st.info("Decision Card sẽ xuất hiện tại đây.")
     else:
@@ -3763,4 +3726,298 @@ st.markdown('''
 ''', unsafe_allow_html=True)
 
 
+# ============================================================
+# 9. MODERN MINIMAL UI — visual layer only, no business logic
+# ============================================================
+
+st.markdown(
+    """
+<style>
+:root {
+    --opc-bg: #f6f7f9;
+    --opc-surface: #ffffff;
+    --opc-surface-soft: #f9fafb;
+    --opc-border: #e5e7eb;
+    --opc-border-strong: #d1d5db;
+    --opc-text: #111827;
+    --opc-muted: #6b7280;
+    --opc-accent: #4f46e5;
+    --opc-accent-soft: #eef2ff;
+    --opc-success: #059669;
+    --opc-warning: #d97706;
+    --opc-danger: #dc2626;
+    --opc-radius: 14px;
+    --opc-shadow: 0 1px 2px rgba(17, 24, 39, 0.04), 0 8px 24px rgba(17, 24, 39, 0.035);
+}
+
+html, body, [class*="css"], .stApp, button, input, textarea, select {
+    font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+
+.stApp {
+    background: var(--opc-bg) !important;
+    color: var(--opc-text) !important;
+    padding-bottom: 2rem !important;
+}
+
+header[data-testid="stHeader"] {
+    background: rgba(246, 247, 249, 0.86) !important;
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(229, 231, 235, 0.75);
+}
+
+.block-container {
+    max-width: 1440px !important;
+    padding: 1.6rem 2.25rem 3rem !important;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: var(--opc-text) !important;
+    font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+    letter-spacing: -0.035em !important;
+}
+
+h2 { font-size: 1.65rem !important; font-weight: 720 !important; }
+h3 { font-size: 1.22rem !important; font-weight: 700 !important; }
+p, li, [data-testid="stMarkdownContainer"] { line-height: 1.58; }
+
+/* Clean product header */
+.hero-title-box {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    animation: none !important;
+    transform: none !important;
+}
+
+.hero-title-box:hover { transform: none !important; }
+.hero-title-box span { display: inline-block !important; } /* Fix: do not hide spans */
+.hero-title-box h1 {
+    background: none !important;
+    -webkit-background-clip: initial !important;
+    -webkit-text-fill-color: var(--opc-text) !important;
+    color: var(--opc-text) !important;
+    animation: none !important;
+    font-size: 2.2rem !important; /* Fix: use standard rem instead of clamp which might fail */
+    font-weight: 800 !important;
+    letter-spacing: normal !important; /* Fix: normal letter spacing */
+    word-spacing: normal !important;
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background: #fbfbfc !important;
+    border-right: 1px solid var(--opc-border) !important;
+    box-shadow: none !important;
+}
+
+section[data-testid="stSidebar"] > div { padding-top: 1.5rem; }
+
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 2px 0 22px;
+    margin-bottom: 22px;
+    border-bottom: 1px solid var(--opc-border);
+}
+
+.sidebar-brand-mark {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    color: white;
+    background: var(--opc-text);
+    font-size: 0.86rem;
+    font-weight: 800;
+}
+
+.sidebar-brand-name { color: var(--opc-text); font-size: 0.94rem; font-weight: 720; line-height: 1.25; }
+.sidebar-brand-meta { color: var(--opc-muted); font-size: 0.72rem; margin-top: 2px; }
+.sidebar-section-label, .section-eyebrow {
+    color: var(--opc-muted);
+    font-size: 0.68rem;
+    line-height: 1;
+    font-weight: 750;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+}
+.sidebar-section-label { margin: 2px 0 14px; }
+.section-eyebrow { margin: 4px 0 7px; }
+
+/* Main navigation */
+div[data-testid="stTabs"] {
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 0 1.5rem !important;
+}
+
+div[data-testid="stTabs"] [data-baseweb="tab-list"] {
+    width: fit-content;
+    gap: 3px;
+    padding: 4px;
+    background: #eceef2;
+    border-radius: 12px;
+}
+
+div[data-testid="stTabs"] button[data-baseweb="tab"] {
+    height: 42px !important;
+    min-width: 0 !important;
+    padding: 0 18px !important;
+    border: 0 !important;
+    border-radius: 9px !important;
+    background: transparent !important;
+    color: #6b7280 !important;
+    box-shadow: none !important;
+}
+
+div[data-testid="stTabs"] button[data-baseweb="tab"] p {
+    color: inherit !important;
+    font-size: 0.84rem !important;
+    font-weight: 650 !important;
+    letter-spacing: -0.01em;
+}
+
+div[data-testid="stTabs"] button[aria-selected="true"] {
+    color: var(--opc-text) !important;
+    background: var(--opc-surface) !important;
+    box-shadow: 0 1px 3px rgba(17, 24, 39, 0.10) !important;
+}
+
+div[data-testid="stTabs"] [data-baseweb="tab-highlight"],
+div[data-testid="stTabs"] [data-baseweb="tab-border"] { display: none !important; }
+
+/* Controls */
+[data-testid="stWidgetLabel"] p {
+    color: #374151 !important;
+    font-size: 0.82rem !important;
+    font-weight: 620 !important;
+}
+
+.stTextInput input, .stTextArea textarea, .stNumberInput input,
+.stDateInput input, [data-baseweb="select"] > div,
+[data-testid="stFileUploaderDropzone"] {
+    color: var(--opc-text) !important;
+    background: var(--opc-surface) !important;
+    border: 1px solid var(--opc-border-strong) !important;
+    border-radius: 10px !important;
+    box-shadow: none !important;
+}
+
+.stTextInput input:focus, .stTextArea textarea:focus, .stNumberInput input:focus,
+.stDateInput input:focus, [data-baseweb="select"] > div:focus-within {
+    border-color: var(--opc-accent) !important;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12) !important;
+}
+
+[data-testid="stFileUploaderDropzone"] { padding: 1rem !important; background: #fafafa !important; }
+[data-testid="stFileUploaderDropzone"] button { min-height: 36px !important; }
+
+.stButton > button, .stDownloadButton > button, .stFormSubmitButton > button {
+    min-height: 42px !important;
+    border-radius: 10px !important;
+    border: 1px solid var(--opc-border-strong) !important;
+    background: var(--opc-surface) !important;
+    color: #374151 !important;
+    box-shadow: none !important;
+    font-size: 0.84rem !important;
+    font-weight: 650 !important;
+    transition: border-color 120ms ease, background 120ms ease, color 120ms ease !important;
+}
+
+.stButton > button:hover, .stDownloadButton > button:hover, .stFormSubmitButton > button:hover {
+    transform: none !important;
+    border-color: #9ca3af !important;
+    background: #f9fafb !important;
+    color: var(--opc-text) !important;
+}
+
+button[kind="primary"], .stFormSubmitButton button[kind="primary"] {
+    color: white !important;
+    background: var(--opc-accent) !important;
+    border-color: var(--opc-accent) !important;
+}
+
+button[kind="primary"]:hover, .stFormSubmitButton button[kind="primary"]:hover {
+    color: white !important;
+    background: #4338ca !important;
+    border-color: #4338ca !important;
+}
+
+/* Surfaces */
+[data-testid="stAlert"], [data-testid="stStatusWidget"],
+[data-testid="stExpander"], [data-testid="stDataFrame"] {
+    border: 1px solid var(--opc-border) !important;
+    border-radius: var(--opc-radius) !important;
+    box-shadow: none !important;
+}
+
+[data-testid="stAlert"] { padding: 0.8rem 0.95rem !important; }
+[data-testid="stExpander"] { background: var(--opc-surface) !important; overflow: hidden; }
+[data-testid="stExpander"] summary { min-height: 48px; font-size: 0.88rem; }
+[data-testid="stDataFrame"] { overflow: hidden; background: var(--opc-surface); }
+
+.agent-card {
+    background: var(--opc-surface) !important;
+    backdrop-filter: none !important;
+    border: 1px solid var(--opc-border) !important;
+    border-radius: var(--opc-radius) !important;
+    padding: 18px !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+.agent-card::before { width: 3px !important; background: var(--opc-accent) !important; }
+.agent-card:hover { transform: none !important; box-shadow: none !important; border-color: #c7d2fe !important; }
+
+/* KPI and executive cards */
+.kpi-grid { gap: 14px !important; margin-bottom: 24px !important; }
+.kpi-card {
+    min-height: 132px;
+    background: var(--opc-surface) !important;
+    backdrop-filter: none !important;
+    padding: 20px !important;
+    border: 1px solid var(--opc-border) !important;
+    border-radius: var(--opc-radius) !important;
+    box-shadow: var(--opc-shadow) !important;
+}
+.kpi-card:hover { transform: none !important; border-color: var(--opc-border) !important; box-shadow: var(--opc-shadow) !important; }
+.kpi-title { color: var(--opc-muted) !important; font-size: 0.7rem !important; letter-spacing: 0.09em !important; }
+.kpi-value { color: var(--opc-text) !important; font-size: 1.9rem !important; font-weight: 720 !important; }
+.progress-bar-bg { height: 4px !important; background: #eef0f3 !important; }
+.dash-section-title { color: var(--opc-text) !important; font-size: 1rem !important; margin-bottom: 12px !important; }
+.reasons-list { gap: 8px !important; }
+.reasons-list li {
+    background: var(--opc-surface) !important;
+    border: 1px solid var(--opc-border) !important;
+    border-radius: 11px !important;
+    padding: 14px 16px !important;
+    box-shadow: none !important;
+}
+
+/* Remove decorative floating brand; product identity already lives in sidebar. */
+.newbie-header { display: none !important; }
+
+/* Calm motion */
+.hero-title-box, .hero-title-box *, .newbie-logo, .newbie-icon,
+.kpi-card, .agent-card { animation: none !important; }
+
+/* Responsive */
+@media (max-width: 900px) {
+    .block-container { padding: 1.25rem 1rem 2rem !important; }
+    div[data-testid="stTabs"] [data-baseweb="tab-list"] { width: 100%; overflow-x: auto; }
+    div[data-testid="stTabs"] button[data-baseweb="tab"] { padding: 0 12px !important; }
+    div[data-testid="stTabs"] button[data-baseweb="tab"] p { font-size: 0.76rem !important; }
+}
+</style>
+    """,
+    unsafe_allow_html=True,
+)
 
