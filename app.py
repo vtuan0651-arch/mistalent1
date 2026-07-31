@@ -1991,35 +1991,57 @@ def enforce_crisis_decision_card(
 st.markdown(
     """
 <style>
-/* Import font hiện đại — Outfit cho nội dung, Inter cho tiêu đề/nhãn (đã được
-   dùng ở nhiều nơi trong app nhưng trước đây chưa được import). */
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700;800;900&display=swap');
+/* Font hệ thống — đồng bộ với bản UI preview: Inter cho toàn bộ giao diện. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;750;800;900&display=swap');
 
-html, body, [class*="css"] {
-    font-family: 'Outfit', sans-serif !important;
-    color: #1e293b !important;
+:root {
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --surface-muted: #f8f9fb;
+    --ink: #172033;
+    --muted: #667085;
+    --subtle: #98a2b3;
+    --line: #e5e8ef;
+    --line-strong: #d6dae4;
+    --brand: #4f46e5;
+    --brand-dark: #3730a3;
+    --brand-soft: #eef2ff;
+    --success: #137a52;
+    --success-soft: #e9f8f1;
+    --warning: #a15c07;
+    --warning-soft: #fff6e7;
+    --danger: #b42318;
+    --danger-soft: #fff0ee;
+    --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 10px 30px rgba(16, 24, 40, 0.05);
+    --radius: 18px;
+    --radius-sm: 12px;
 }
 
-/* Nền tảng tổng thể - Gradient nhẹ nhàng */
+html, body, [class*="css"] {
+    font-family: 'Inter', ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+    color: var(--ink) !important;
+}
+
+/* Nền tảng tổng thể - phẳng, sáng, giống bản UI preview */
 .stApp {
-    background: linear-gradient(135deg, #f0f4fd 0%, #ffffff 100%);
-    color: #1e293b;
+    background: var(--bg);
+    color: var(--ink);
 }
 
 /* --- Tăng độ tương phản chữ / dễ đọc hơn (không đổi logic, chỉ đổi giao diện) --- */
 
 /* Toàn bộ tiêu đề mặc định rõ nét, đậm, tối màu thay vì mờ nhạt */
 h1, h2, h3, h4, h5, h6 {
-    color: #0f172a !important;
+    color: var(--ink) !important;
     font-weight: 700 !important;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
 }
 
 /* Đoạn văn bản / markdown mặc định trong nội dung chính */
 .stMarkdown, .stMarkdown p, .stMarkdown li, .stMarkdown span,
 [data-testid="stMarkdownContainer"] p,
 [data-testid="stMarkdownContainer"] li {
-    color: #1e293b;
+    color: var(--ink);
     font-size: 1rem;
     line-height: 1.6;
 }
@@ -2028,52 +2050,90 @@ h1, h2, h3, h4, h5, h6 {
 label, .stTextInput label, .stSelectbox label, .stRadio label,
 .stCheckbox label, .stFileUploader label, .stSlider label,
 [data-testid="stWidgetLabel"] p {
-    color: #1e293b !important;
+    color: var(--ink) !important;
     font-weight: 600 !important;
     opacity: 1 !important;
 }
 
 /* Caption / chú thích nhỏ vẫn giữ nhẹ nhàng nhưng đủ tương phản để đọc được */
 [data-testid="stCaptionContainer"], .stCaption {
-    color: #475569 !important;
+    color: var(--muted) !important;
 }
 
-/* Sidebar: nền trắng rõ ràng + chữ tối màu, tránh bị mờ trên nền gradient */
+/* Sidebar: nền tối (navy), chữ sáng — đúng phong cách "app shell" trong UI preview */
 section[data-testid="stSidebar"] {
-    background: #ffffff;
-    border-right: 1px solid #e2e8f0;
+    background: #111827;
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 section[data-testid="stSidebar"] * {
-    color: #1e293b;
+    color: #f8fafc;
 }
 
 section[data-testid="stSidebar"] h1,
 section[data-testid="stSidebar"] h2,
 section[data-testid="stSidebar"] h3 {
-    color: #0f172a !important;
+    color: #ffffff !important;
+    letter-spacing: -0.01em;
+}
+
+section[data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+section[data-testid="stSidebar"] .stCaption {
+    color: #98a2b3 !important;
+}
+
+/* Ô nhập trong sidebar theo phong cách .side-field của UI preview */
+section[data-testid="stSidebar"] input,
+section[data-testid="stSidebar"] textarea,
+section[data-testid="stSidebar"] .stSelectbox > div > div > div {
+    background: rgba(255, 255, 255, 0.07) !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    color: #f8fafc !important;
+    border-radius: 10px !important;
+}
+
+section[data-testid="stSidebar"] input:focus {
+    border-color: #818cf8 !important;
+    box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.25) !important;
+}
+
+section[data-testid="stSidebar"] [data-testid="stAlert"] {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: var(--radius-sm) !important;
+}
+
+section[data-testid="stSidebar"] [data-testid="stAlert"] p {
+    color: #cbd5e1 !important;
 }
 
 /* Placeholder trong input rõ hơn một chút để vẫn đọc được nhưng không lẫn với giá trị thật */
 input::placeholder, textarea::placeholder {
-    color: #94a3b8 !important;
+    color: var(--subtle) !important;
     opacity: 1 !important;
 }
 
 /* Nội dung bên trong expander */
+[data-testid="stExpander"] {
+    border: 1px solid var(--line) !important;
+    border-radius: var(--radius-sm) !important;
+    background: var(--surface) !important;
+    box-shadow: var(--shadow);
+}
+
 [data-testid="stExpander"] summary {
-    color: #0f172a !important;
-    font-weight: 600 !important;
+    color: var(--ink) !important;
+    font-weight: 650 !important;
 }
 
 /* Chữ trong bảng dữ liệu rõ nét hơn */
 [data-testid="stDataFrame"] * {
-    color: #1e293b;
+    color: var(--ink);
 }
 
 /* Tabs: nội dung chữ bên trong mỗi tab */
 .stTabs [data-baseweb="tab-panel"] {
-    color: #1e293b;
+    color: var(--ink);
 }
 
 .block-container {
@@ -2082,148 +2142,150 @@ input::placeholder, textarea::placeholder {
     max-width: 95% !important;
 }
 
-/* Hiệu ứng nổi bồng bềnh cho các thành phần */
-@keyframes float {
-    0% { transform: translateY(0px); }
-    50% { transform: translateY(-5px); }
-    100% { transform: translateY(0px); }
-}
-
-/* Agent Card - Glassmorphism & Hover */
+/* Agent Card — mặt phẳng, viền mảnh, đổ bóng nhẹ (giống .card trong UI preview) */
 .agent-card {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    border-radius: 16px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
     padding: 20px;
     margin-bottom: 16px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
-    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    box-shadow: var(--shadow);
     position: relative;
     overflow: hidden;
-}
-
-.agent-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 30px rgba(43, 88, 255, 0.08);
-    border-color: rgba(43, 88, 255, 0.2);
 }
 
 .agent-card::before {
     content: '';
     position: absolute;
     top: 0; left: 0; width: 4px; height: 100%;
-    background: linear-gradient(180deg, #3b82f6, #8b5cf6);
+    background: var(--brand);
     border-radius: 4px 0 0 4px;
 }
 
-/* Decision Card - Điểm nhấn chính */
+/* Decision Card — điểm nhấn chính, phẳng, không gradient */
 .decision-card {
-    background: linear-gradient(145deg, #ffffff, #f8faff);
-    border: 2px solid transparent;
-    background-clip: padding-box;
-    border-radius: 20px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
     padding: 24px;
-    box-shadow: 0 10px 40px rgba(11, 46, 172, 0.08);
+    box-shadow: var(--shadow);
     position: relative;
-    transition: all 0.3s ease;
-}
-
-.decision-card::after {
-    content: '';
-    position: absolute;
-    top: -2px; bottom: -2px; left: -2px; right: -2px;
-    background: linear-gradient(135deg, #3b82f6, #8b5cf6, #ec4899);
-    z-index: -1;
-    border-radius: 22px;
-    opacity: 0.8;
 }
 
 .decision-card h2 {
-    background: linear-gradient(135deg, #1e3a8a, #3b82f6);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    font-weight: 700;
-    font-size: 2.2rem;
+    color: var(--brand-dark);
+    font-weight: 800;
+    font-size: 2.1rem;
+    letter-spacing: -0.03em;
     margin-top: 0;
 }
 
 /* Tùy chỉnh các thành phần Streamlit */
-/* Buttons */
+/* Buttons — phẳng, đơn sắc thương hiệu, giống .button-primary trong UI preview */
 .stButton > button {
-    background: linear-gradient(135deg, #2563eb, #4f46e5);
+    background: var(--brand);
     color: white !important;
-    border: none !important;
-    border-radius: 10px;
-    font-weight: 600;
+    border: 1px solid var(--brand) !important;
+    border-radius: var(--radius-sm);
+    font-weight: 650;
     padding: 0.5rem 1rem;
-    transition: all 0.3s ease !important;
-    box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+    transition: all 0.15s ease !important;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
 }
 
 .stButton > button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+    background: var(--brand-dark);
+    border-color: var(--brand-dark) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(79, 70, 229, 0.25);
 }
 
 .stButton > button:active {
-    transform: translateY(1px);
+    transform: translateY(0px);
 }
 
 /* Inputs & Selectboxes */
 .stTextInput > div > div > input, 
+.stNumberInput > div > div > input,
+.stTextArea textarea,
 .stSelectbox > div > div > div {
-    border-radius: 8px !important;
-    border: 1px solid #e5e7eb !important;
-    background-color: #ffffff !important;
-    color: #0f172a !important;
+    border-radius: var(--radius-sm) !important;
+    border: 1px solid var(--line) !important;
+    background-color: var(--surface) !important;
+    color: var(--ink) !important;
     font-weight: 500 !important;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.02) !important;
-    transition: all 0.2s ease;
+    box-shadow: none !important;
+    transition: all 0.15s ease;
 }
 
 .stTextInput > div > div > input:focus,
+.stNumberInput > div > div > input:focus,
+.stTextArea textarea:focus,
 .stSelectbox > div > div > div:focus {
-    border-color: #3b82f6 !important;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
+    border-color: var(--brand) !important;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15) !important;
 }
 
 /* Metrics */
 div[data-testid="stMetricValue"] {
-    font-size: 2rem !important;
-    font-weight: 400 !important;
-    color: #1e3a8a !important;
+    font-size: 1.9rem !important;
+    font-weight: 800 !important;
+    color: var(--ink) !important;
+    letter-spacing: -0.02em;
 }
 
 div[data-testid="stMetricLabel"] {
     font-weight: 700 !important;
-    color: #64748b !important;
+    color: var(--muted) !important;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    font-size: 0.85rem !important;
+    letter-spacing: 0.06em;
+    font-size: 0.78rem !important;
+}
+
+div[data-testid="stMetric"] {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    box-shadow: var(--shadow);
 }
 
 /* Dataframes */
 [data-testid="stDataFrame"] {
-    border-radius: 12px;
+    border-radius: var(--radius-sm);
     overflow: hidden;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    border: 1px solid #f1f5f9;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--line);
 }
 
 /* Muted text */
 .small-muted {
     font-size: 0.85rem; 
-    color: #64748b;
+    color: var(--muted);
     font-weight: 500;
 }
 
 /* Status spinner/box */
 [data-testid="stStatusWidget"] {
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-    background: white;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+    background: var(--surface);
+}
+
+/* Alert boxes (st.success / st.info / st.warning / st.error) — bo góc đồng bộ */
+[data-testid="stAlert"] {
+    border-radius: var(--radius-sm) !important;
+    box-shadow: var(--shadow);
+}
+
+/* Form container */
+[data-testid="stForm"] {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 18px;
+    box-shadow: var(--shadow);
 }
 </style>
 """,
@@ -2231,71 +2293,19 @@ div[data-testid="stMetricLabel"] {
 )
 
 st.markdown("""
-<div style="text-align: center; margin-top: 10px; margin-bottom: 30px; position: relative; z-index: 50;">
-    <div style="
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 15px;
-        background: rgba(255, 255, 255, 0.85);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        padding: 12px 36px;
-        border-radius: 999px;
-        box-shadow: 0 8px 30px rgba(59, 130, 246, 0.12), inset 0 2px 4px rgba(255,255,255,0.8);
-        border: 1px solid rgba(226, 232, 240, 0.9);
-        animation: floatTitle 5s ease-in-out infinite;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    " class="hero-title-box">
-        <span style="font-size: 2.2rem; animation: pulseBot 2.5s infinite; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));">🤖</span>
-        <h1 style="
-            margin: 0;
-            font-family: 'Inter', sans-serif;
-            font-size: 2rem;
-            font-weight: 900;
-            background: linear-gradient(90deg, #1e3a8a, #3b82f6, #8b5cf6, #ec4899);
-            background-size: 200% auto;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            letter-spacing: -0.02em;
-            animation: textShine 4s linear infinite;
-        ">
-            OPC Multi-Agent Contract Decision System
-        </h1>
+<div style="margin-top: 4px; margin-bottom: 26px; padding: 22px 26px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap;">
+    <div>
+        <p style="margin: 0 0 6px; color: var(--brand); font-size: 12px; font-weight: 750; text-transform: uppercase; letter-spacing: 0.1em;">Multi-Agent Decision System</p>
+        <h1 style="margin: 0; font-size: clamp(22px, 2.4vw, 30px); font-weight: 800; letter-spacing: -0.03em; color: var(--ink);">🤖 OPC Multi-Agent Contract Decision System</h1>
+        <p style="margin: 10px 0 0; color: var(--muted); font-size: 13px; font-weight: 600; letter-spacing: 0.02em;">
+            Team Pack (CSV) <span style="color: var(--brand); font-weight: 700;">→</span> Finance Agent <span style="color: var(--brand); font-weight: 700;">→</span> Risk Agent <span style="color: var(--brand); font-weight: 700;">→</span> Decision Agent <span style="color: var(--brand); font-weight: 700;">→</span> Founder Approval
+        </p>
     </div>
-    <div style="
-        font-family: 'Inter', sans-serif;
-        font-size: 0.95rem;
-        color: #64748b;
-        margin-top: 20px;
-        font-weight: 600;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
-    ">
-        Team Pack (CSV) <span style="color: #3b82f6">→</span> Finance Agent <span style="color: #3b82f6">→</span> Risk Agent <span style="color: #3b82f6">→</span> Decision Agent <span style="color: #3b82f6">→</span> Founder Approval
-    </div>
+    <span style="display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; border-radius: 999px; font-size: 12px; font-weight: 700; padding: 9px 13px; color: var(--success); background: var(--success-soft); border: 1px solid #c8ebdc;">
+        <span style="width: 8px; height: 8px; border-radius: 999px; background: #34d399; display: inline-block; box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.12);"></span>
+        System online
+    </span>
 </div>
-
-<style>
-@keyframes floatTitle {
-    0% { transform: translateY(0px); }
-    50% { transform: translateY(-6px); box-shadow: 0 15px 35px rgba(59, 130, 246, 0.18), inset 0 2px 4px rgba(255,255,255,0.8); }
-    100% { transform: translateY(0px); }
-}
-@keyframes pulseBot {
-    0% { transform: scale(1) rotate(0deg); }
-    25% { transform: scale(1.1) rotate(-5deg); filter: drop-shadow(0 0 10px rgba(59,130,246,0.4)); }
-    50% { transform: scale(1) rotate(0deg); }
-    75% { transform: scale(1.1) rotate(5deg); filter: drop-shadow(0 0 10px rgba(139,92,246,0.4)); }
-    100% { transform: scale(1) rotate(0deg); }
-}
-@keyframes textShine {
-    to { background-position: 200% center; }
-}
-.hero-title-box:hover {
-    transform: scale(1.02);
-}
-</style>
 """, unsafe_allow_html=True)
 
 with st.sidebar:
@@ -2322,43 +2332,44 @@ result = st.session_state.get("opc_result")
 
 st.markdown("""
 <style>
-/* Khung bao quanh thanh tab chính, giúp tab nổi bật và rõ ràng hơn */
+/* Khung bao quanh thanh tab chính — dạng "pill track" giống UI preview */
 div[data-testid="stTabs"] {
-    background: #f8fafc;
-    border: 2px solid #e2e8f0;
-    border-radius: 16px;
-    padding: 10px 14px 0 14px;
-    margin-bottom: 18px;
-    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+    background: #e9ebf0;
+    border: none;
+    border-radius: 13px;
+    padding: 5px;
+    margin-bottom: 20px;
+    box-shadow: none;
 }
 
 div[data-testid="stTabs"] button[data-baseweb="tab"] {
-    height: 56px;
-    padding: 0 22px;
-    font-size: 1.15rem !important;
+    height: 46px;
+    padding: 0 20px;
+    font-size: 0.95rem !important;
     font-weight: 700 !important;
-    color: #475569;
-    border-radius: 10px 10px 0 0;
+    color: var(--muted);
+    border-radius: 9px;
 }
 
 div[data-testid="stTabs"] button[data-baseweb="tab"] p {
-    font-size: 1.15rem !important;
+    font-size: 0.95rem !important;
     font-weight: 700 !important;
 }
 
 div[data-testid="stTabs"] button[aria-selected="true"] {
-    color: #b91c1c !important;
+    color: var(--brand-dark) !important;
     background: #ffffff;
-    border-bottom: 4px solid #ef4444 !important;
+    border-bottom: none !important;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
 }
 
 div[data-testid="stTabs"] [data-baseweb="tab-highlight"] {
-    background-color: #ef4444 !important;
-    height: 4px !important;
+    background-color: transparent !important;
+    height: 0 !important;
 }
 
 div[data-testid="stTabs"] [data-baseweb="tab-border"] {
-    background-color: #e2e8f0 !important;
+    background-color: transparent !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -2790,28 +2801,28 @@ with tab_ops:
                     agent_name = log["agent"]
 
                     st.markdown(
-                        '<div style="font-weight:700; color:#0f172a; font-size:0.8rem; '
-                        'text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">'
+                        '<div style="font-weight:700; color:var(--ink); font-size:0.78rem; '
+                        'text-transform:uppercase; letter-spacing:0.06em; margin-bottom:6px;">'
                         '📥 Input</div>',
                         unsafe_allow_html=True,
                     )
                     st.json(log.get("input", {}), expanded=False)
 
                     st.markdown(
-                        '<div style="font-weight:700; color:#0f172a; font-size:0.8rem; '
-                        'text-transform:uppercase; letter-spacing:0.05em; margin-top:16px; margin-bottom:6px;">'
+                        '<div style="font-weight:700; color:var(--ink); font-size:0.78rem; '
+                        'text-transform:uppercase; letter-spacing:0.06em; margin-top:16px; margin-bottom:6px;">'
                         '⚙️ Action</div>',
                         unsafe_allow_html=True,
                     )
                     st.markdown(
-                        f'<div style="color:#334155; font-size:0.9rem; line-height:1.5; margin-bottom:10px;">'
+                        f'<div style="color:var(--muted); font-size:0.9rem; line-height:1.5; margin-bottom:10px;">'
                         f'{log.get("action", "")}</div>',
                         unsafe_allow_html=True,
                     )
 
                     st.markdown(
-                        '<div style="font-weight:700; color:#0f172a; font-size:0.8rem; '
-                        'text-transform:uppercase; letter-spacing:0.05em; margin-top:16px; margin-bottom:6px;">'
+                        '<div style="font-weight:700; color:var(--ink); font-size:0.78rem; '
+                        'text-transform:uppercase; letter-spacing:0.06em; margin-top:16px; margin-bottom:6px;">'
                         '📤 Output</div>',
                         unsafe_allow_html=True,
                     )
@@ -2820,13 +2831,13 @@ with tab_ops:
                         st.markdown(f"""
 <div class="agent-card" style="margin-bottom: 0;">
 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-<span style="background: #e0e7ff; color: #3730a3; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;">Quality: {res.get('data_quality', 'N/A')}</span>
-<span style="background: #dcfce3; color: #166534; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;">Assessment: {res.get('preliminary_assessment', 'N/A')}</span>
+<span style="background: var(--brand-soft); color: var(--brand-dark); padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;">Quality: {res.get('data_quality', 'N/A')}</span>
+<span style="background: var(--success-soft); color: var(--success); padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;">Assessment: {res.get('preliminary_assessment', 'N/A')}</span>
 </div>
-<p style="color: #334155; font-size: 0.95rem; line-height: 1.5;">{res.get('summary', '')}</p>
-<div style="background: #f8fafc; border-left: 3px solid #3b82f6; padding: 12px; margin-bottom: 15px; border-radius: 4px;">
-<strong style="color: #1e293b; font-size: 0.9rem;">Key Observations:</strong>
-<ul style="margin-top: 8px; margin-bottom: 0; color: #475569; font-size: 0.9rem; padding-left: 20px;">
+<p style="color: var(--ink); font-size: 0.95rem; line-height: 1.5;">{res.get('summary', '')}</p>
+<div style="background: var(--surface-muted); border-left: 3px solid var(--brand); padding: 12px; margin-bottom: 15px; border-radius: 4px;">
+<strong style="color: var(--ink); font-size: 0.9rem;">Key Observations:</strong>
+<ul style="margin-top: 8px; margin-bottom: 0; color: var(--muted); font-size: 0.9rem; padding-left: 20px;">
 {''.join(f'<li>{obs}</li>' for obs in res.get('key_observations', []))}
 </ul>
 </div>
@@ -2835,29 +2846,29 @@ with tab_ops:
 
                     elif "Risk" in agent_name:
                         risk_level = res.get('risk_level', 'LOW')
-                        risk_color = "#ef4444" if risk_level in ["CRITICAL", "HIGH"] else "#eab308" if risk_level == "MEDIUM" else "#22c55e"
+                        risk_color = "#b42318" if risk_level in ["CRITICAL", "HIGH"] else "#a15c07" if risk_level == "MEDIUM" else "#137a52"
                         st.markdown(f"""
 <div class="agent-card" style="margin-bottom: 0;">
 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-<span style="background: {risk_color}20; color: {risk_color}; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.85rem;">Risk: {risk_level}</span>
+<span style="background: {risk_color}1a; color: {risk_color}; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.85rem;">Risk: {risk_level}</span>
 </div>
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-<div style="background: #fef2f2; border: 1px solid #fecaca; padding: 12px; border-radius: 8px;">
-<strong style="color: #991b1b; font-size: 0.9rem;">Warnings / Rules</strong>
-<ul style="margin-top: 8px; margin-bottom: 0; color: #7f1d1d; font-size: 0.85rem; padding-left: 16px;">
+<div style="background: var(--danger-soft); border: 1px solid #f3c6c0; padding: 12px; border-radius: 8px;">
+<strong style="color: var(--danger); font-size: 0.9rem;">Warnings / Rules</strong>
+<ul style="margin-top: 8px; margin-bottom: 0; color: var(--danger); font-size: 0.85rem; padding-left: 16px;">
 {''.join(f'<li>{w}</li>' for w in res.get('warnings', []))}
 </ul>
 </div>
-<div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 12px; border-radius: 8px;">
-<strong style="color: #166534; font-size: 0.9rem;">Recommended Controls</strong>
-<ul style="margin-top: 8px; margin-bottom: 0; color: #14532d; font-size: 0.85rem; padding-left: 16px;">
+<div style="background: var(--success-soft); border: 1px solid #bfe9d5; padding: 12px; border-radius: 8px;">
+<strong style="color: var(--success); font-size: 0.9rem;">Recommended Controls</strong>
+<ul style="margin-top: 8px; margin-bottom: 0; color: var(--success); font-size: 0.85rem; padding-left: 16px;">
 {''.join(f'<li>{c}</li>' for c in res.get('recommended_controls', []))}
 </ul>
 </div>
 </div>
-<div style="background: #fffbeb; border: 1px solid #fde68a; padding: 12px; margin-bottom: 15px; border-radius: 8px;">
-<strong style="color: #92400e; font-size: 0.9rem;">Human Confirmation Points</strong>
-<ul style="margin-top: 8px; margin-bottom: 0; color: #b45309; font-size: 0.85rem; padding-left: 16px;">
+<div style="background: var(--warning-soft); border: 1px solid #f2ddb0; padding: 12px; margin-bottom: 15px; border-radius: 8px;">
+<strong style="color: var(--warning); font-size: 0.9rem;">Human Confirmation Points</strong>
+<ul style="margin-top: 8px; margin-bottom: 0; color: var(--warning); font-size: 0.85rem; padding-left: 16px;">
 {''.join(f'<li>{c}</li>' for c in res.get('human_confirmation_points', []))}
 </ul>
 </div>
@@ -2866,17 +2877,17 @@ with tab_ops:
 
                     elif "Decision" in agent_name:
                         st.markdown(f"""
-<div class="agent-card" style="margin-bottom: 0; border: 1px solid #c7d2fe;">
+<div class="agent-card" style="margin-bottom: 0; border: 1px solid var(--brand-soft);">
 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-<span style="background: #818cf8; color: white; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;">Recommendation: {res.get('recommendation', 'N/A')}</span>
-<span style="background: #f1f5f9; color: #475569; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;">Approval Required: {'Yes' if res.get('human_approval_required') else 'No'}</span>
+<span style="background: var(--brand); color: white; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;">Recommendation: {res.get('recommendation', 'N/A')}</span>
+<span style="background: var(--surface-muted); color: var(--muted); padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;">Approval Required: {'Yes' if res.get('human_approval_required') else 'No'}</span>
 </div>
-<p style="color: #334155; font-size: 0.95rem; line-height: 1.5;"><strong>Executive Summary:</strong> {res.get('executive_summary', '')}</p>
-<div style="background: #f8fafc; border-left: 3px solid #6366f1; padding: 12px; margin-bottom: 15px; border-radius: 4px;">
-<strong style="color: #312e81; font-size: 0.9rem;">Selected Option:</strong> <span style="color: #4f46e5; font-weight: 600;">{res.get('selected_financing_option', 'N/A')}</span>
+<p style="color: var(--ink); font-size: 0.95rem; line-height: 1.5;"><strong>Executive Summary:</strong> {res.get('executive_summary', '')}</p>
+<div style="background: var(--surface-muted); border-left: 3px solid var(--brand); padding: 12px; margin-bottom: 15px; border-radius: 4px;">
+<strong style="color: var(--brand-dark); font-size: 0.9rem;">Selected Option:</strong> <span style="color: var(--brand); font-weight: 600;">{res.get('selected_financing_option', 'N/A')}</span>
 </div>
-<div style="background: #fafafa; border-left: 3px solid #f59e0b; padding: 12px; margin-top: 10px; border-radius: 4px;">
-<strong style="color: #92400e; font-size: 0.9rem;">Protection Condition:</strong> <span style="color: #b45309;">{res.get('protection_condition', 'N/A')}</span>
+<div style="background: var(--warning-soft); border-left: 3px solid var(--warning); padding: 12px; margin-top: 10px; border-radius: 4px;">
+<strong style="color: var(--warning); font-size: 0.9rem;">Protection Condition:</strong> <span style="color: var(--warning);">{res.get('protection_condition', 'N/A')}</span>
 </div>
 </div>
                         """, unsafe_allow_html=True)
@@ -3449,29 +3460,28 @@ with tab_dashboard:
         # Render Premium Dashboard KPI
         gm_val = decision['gross_margin']
         gm_pct = int(gm_val * 100) if gm_val else 0
-        gm_color = "#10b981" if gm_val > 0.3 else "#f59e0b" if gm_val > 0.15 else "#ef4444"
+        gm_color = "#137a52" if gm_val > 0.3 else "#a15c07" if gm_val > 0.15 else "#b42318"
         
         conf_val = decision['confidence_score']
         conf_pct = int(conf_val * 100) if conf_val is not None else 0
         conf_str = f"{conf_val:.0%}" if conf_val is not None else "N/A"
-        conf_color = "#8b5cf6" if conf_pct >= 80 else "#6366f1"
+        conf_color = "#4f46e5" if conf_pct >= 80 else "#3730a3"
 
         st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 .dash-container {{ font-family: 'Inter', sans-serif; }}
-.kpi-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px; margin-bottom: 40px; }}
-.kpi-card {{ background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); padding: 24px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); border: 1px solid #e2e8f0; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; }}
-.kpi-card:hover {{ transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04); border-color: #cbd5e1; }}
-.kpi-title {{ font-size: 0.875rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }}
-.kpi-value {{ font-size: 2.25rem; font-weight: 800; color: #0f172a; line-height: 1.2; letter-spacing: -0.02em; }}
-.progress-bar-bg {{ width: 100%; height: 6px; background-color: #e2e8f0; border-radius: 9999px; margin-top: 12px; overflow: hidden; }}
+.kpi-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 32px; }}
+.kpi-card {{ background: var(--surface); padding: 22px; border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--line); transition: box-shadow 0.15s ease; position: relative; overflow: hidden; }}
+.kpi-card:hover {{ border-color: var(--line-strong); }}
+.kpi-title {{ font-size: 0.78rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }}
+.kpi-value {{ font-size: 2.1rem; font-weight: 800; color: var(--ink); line-height: 1.2; letter-spacing: -0.02em; }}
+.progress-bar-bg {{ width: 100%; height: 6px; background-color: var(--line); border-radius: 9999px; margin-top: 12px; overflow: hidden; }}
 .progress-bar-fill {{ height: 100%; border-radius: 9999px; transition: width 1s ease-in-out; }}
-.dash-section-title {{ font-size: 1.25rem; font-weight: 700; color: #1e293b; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; font-family: 'Inter', sans-serif; letter-spacing: -0.01em; }}
+.dash-section-title {{ font-size: 1.15rem; font-weight: 700; color: var(--ink); margin-bottom: 18px; display: flex; align-items: center; gap: 10px; font-family: 'Inter', sans-serif; letter-spacing: -0.01em; }}
 .reasons-list {{ list-style-type: none; padding: 0; display: flex; flex-direction: column; gap: 12px; }}
-.reasons-list li {{ background: white; padding: 16px 20px; border-radius: 12px; border: 1px solid #e2e8f0; color: #334155; font-size: 0.95rem; line-height: 1.5; display: flex; gap: 12px; align-items: flex-start; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }}
-.reasons-list li svg {{ flex-shrink: 0; width: 20px; height: 20px; color: #6366f1; margin-top: 2px; }}
-.rec-badge {{ display: inline-block; padding: 6px 16px; border-radius: 9999px; font-size: 0.875rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 16px; }}
+.reasons-list li {{ background: var(--surface); padding: 16px 20px; border-radius: var(--radius-sm); border: 1px solid var(--line); color: var(--ink); font-size: 0.95rem; line-height: 1.5; display: flex; gap: 12px; align-items: flex-start; box-shadow: var(--shadow); }}
+.reasons-list li svg {{ flex-shrink: 0; width: 20px; height: 20px; color: var(--brand); margin-top: 2px; }}
+.rec-badge {{ display: inline-block; padding: 6px 16px; border-radius: 9999px; font-size: 0.85rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 16px; }}
 </style>
 <div class="dash-container kpi-grid">
 <div class="kpi-card">
@@ -3482,12 +3492,12 @@ with tab_dashboard:
 </div>
 </div>
 <div class="kpi-card">
-<div class="kpi-title">Closing Cash <span style="color: #3b82f6">⬤</span></div>
-<div class="kpi-value" style="font-size: 1.75rem;">{format_vnd(decision["closing_cash"])}</div>
+<div class="kpi-title">Closing Cash <span style="color: var(--brand)">⬤</span></div>
+<div class="kpi-value" style="font-size: 1.65rem;">{format_vnd(decision["closing_cash"])}</div>
 </div>
 <div class="kpi-card">
-<div class="kpi-title">Funding Amount <span style="color: #f59e0b">⬤</span></div>
-<div class="kpi-value" style="font-size: 1.75rem;">{format_vnd(decision['funding_amount'])}</div>
+<div class="kpi-title">Funding Amount <span style="color: #a15c07">⬤</span></div>
+<div class="kpi-value" style="font-size: 1.65rem;">{format_vnd(decision['funding_amount'])}</div>
 </div>
 <div class="kpi-card">
 <div class="kpi-title">Confidence Score <span style="color: {conf_color}">⬤</span></div>
@@ -3504,38 +3514,38 @@ with tab_dashboard:
         with dash_col1:
             rec = decision['recommendation']
             if "ACCEPT" in rec:
-                badge_bg, badge_color = "#dcfce7", "#166534"
+                badge_bg, badge_color = "#e9f8f1", "#137a52"
             elif "REJECT" in rec:
-                badge_bg, badge_color = "#fee2e2", "#991b1b"
+                badge_bg, badge_color = "#fff0ee", "#b42318"
             else:
-                badge_bg, badge_color = "#fef3c7", "#92400e"
+                badge_bg, badge_color = "#fff6e7", "#a15c07"
                 
             st.markdown(f"""
-<div class="dash-container" style="background: white; border-radius: 24px; padding: 32px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); border: 1px solid #e2e8f0; margin-bottom: 32px;">
+<div class="dash-container" style="background: var(--surface); border-radius: var(--radius); padding: 28px; box-shadow: var(--shadow); border: 1px solid var(--line); margin-bottom: 28px;">
 <div class="rec-badge" style="background: {badge_bg}; color: {badge_color}; border: 1px solid {badge_color}33;">RECOMMENDATION: {rec}</div>
-<div style="display: grid; gap: 20px;">
-<div style="background: #f8fafc; padding: 20px; border-radius: 16px; border: 1px solid #f1f5f9;">
-<div style="font-size: 0.75rem; color: #64748b; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 8px;">SELECTED FINANCING OPTION</div>
-<div style="font-size: 1.25rem; color: #0f172a; font-weight: 700; display: flex; align-items: center; gap: 10px;">
-<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: #3b82f6;"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+<div style="display: grid; gap: 16px;">
+<div style="background: var(--surface-muted); padding: 20px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
+<div style="font-size: 0.75rem; color: var(--muted); font-weight: 700; letter-spacing: 0.06em; margin-bottom: 8px;">SELECTED FINANCING OPTION</div>
+<div style="font-size: 1.2rem; color: var(--ink); font-weight: 700; display: flex; align-items: center; gap: 10px;">
+<svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: var(--brand);"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
 {decision['selected_financing_option']}
 </div>
 </div>
-<div style="padding: 20px; border-radius: 16px; border: 1px solid #e2e8f0;">
-<div style="font-size: 0.75rem; color: #64748b; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 8px;">EXECUTIVE SUMMARY</div>
-<div style="font-size: 1rem; color: #334155; line-height: 1.6;">{decision['executive_summary']}</div>
+<div style="padding: 20px; border-radius: var(--radius-sm); border: 1px solid var(--line);">
+<div style="font-size: 0.75rem; color: var(--muted); font-weight: 700; letter-spacing: 0.06em; margin-bottom: 8px;">EXECUTIVE SUMMARY</div>
+<div style="font-size: 1rem; color: var(--ink); line-height: 1.6;">{decision['executive_summary']}</div>
 </div>
 </div>
 </div>
             """, unsafe_allow_html=True)
             
-            st.markdown('<div class="dash-section-title dash-container"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: #6366f1;"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Lập luận chính (3 Reasons)</div>', unsafe_allow_html=True)
+            st.markdown('<div class="dash-section-title dash-container"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: var(--brand);"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Lập luận chính (3 Reasons)</div>', unsafe_allow_html=True)
             check_svg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>'
             reasons_html = "<ul class='reasons-list dash-container'>" + "".join([f"<li>{check_svg} <span>{r}</span></li>" for r in decision["three_reasons"]]) + "</ul>"
             st.markdown(reasons_html, unsafe_allow_html=True)
 
         with dash_col2:
-            st.markdown('<div class="dash-section-title dash-container"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: #ef4444;"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg> Quản trị Rủi ro</div>', unsafe_allow_html=True)
+            st.markdown('<div class="dash-section-title dash-container"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: var(--danger);"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg> Quản trị Rủi ro</div>', unsafe_allow_html=True)
             
             risk_level = risk_result["risk_level"]
             risk_summary = build_risk_summary_message(
@@ -3549,30 +3559,30 @@ with tab_dashboard:
                 st.success(f"✅ **Risk Level: {risk_level}**\n\n{risk_summary['message']}")
                 
             st.markdown(f"""
-<div class="dash-container" style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 16px; padding: 20px; margin-top: 20px; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(251, 191, 36, 0.1);">
-<div style="font-size: 0.85rem; color: #b45309; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.05em;">
+<div class="dash-container" style="background: var(--warning-soft); border: 1px solid #f2ddb0; border-radius: var(--radius); padding: 20px; margin-top: 20px; margin-bottom: 24px; box-shadow: var(--shadow);">
+<div style="font-size: 0.85rem; color: var(--warning); font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.06em;">
 <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg> Protection Condition
 </div>
-<div style="font-size: 0.95rem; color: #92400e; line-height: 1.6;">{decision['protection_condition']}</div>
+<div style="font-size: 0.95rem; color: var(--warning); line-height: 1.6;">{decision['protection_condition']}</div>
 </div>
             """, unsafe_allow_html=True)
             
             if result["missing_fields"]:
                 st.markdown(f"""
-<div class="dash-container" style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 16px; padding: 20px; margin-bottom: 24px;">
-<div style="font-size: 0.85rem; color: #b91c1c; font-weight: 700; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;">❌ Missing Data Request</div>
-<div style="font-size: 0.95rem; color: #991b1b; line-height: 1.5;">{', '.join(result['missing_fields'])}</div>
+<div class="dash-container" style="background: var(--danger-soft); border: 1px solid #f3c6c0; border-radius: var(--radius); padding: 20px; margin-bottom: 24px;">
+<div style="font-size: 0.85rem; color: var(--danger); font-weight: 700; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.06em;">❌ Missing Data Request</div>
+<div style="font-size: 0.95rem; color: var(--danger); line-height: 1.5;">{', '.join(result['missing_fields'])}</div>
 </div>
                 """, unsafe_allow_html=True)
 
-            st.markdown('<div class="dash-section-title dash-container" style="margin-top: 40px;"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: #3b82f6;"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg> Founder Approval Gate</div>', unsafe_allow_html=True)
+            st.markdown('<div class="dash-section-title dash-container" style="margin-top: 36px;"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: var(--brand);"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg> Founder Approval Gate</div>', unsafe_allow_html=True)
             
             sensitive = decision["human_approval_required"] or result["founder_approval_needed"]
             if sensitive:
                 st.markdown(f"""
-<div class="dash-container" style="background: #fdf2f8; border-left: 4px solid #f43f5e; padding: 16px 20px; border-radius: 0 12px 12px 0; margin-bottom: 20px;">
-<div style="color: #be123c; font-weight: 700; font-size: 0.85rem; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">⚠️ CẢNH BÁO </div>
-<div style="color: #9f1239; font-size: 0.95rem; line-height: 1.5;">{decision['approval_reason']}</div>
+<div class="dash-container" style="background: var(--danger-soft); border-left: 4px solid var(--danger); padding: 16px 20px; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; margin-bottom: 20px;">
+<div style="color: var(--danger); font-weight: 700; font-size: 0.85rem; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.06em;">⚠️ CẢNH BÁO </div>
+<div style="color: var(--danger); font-size: 0.95rem; line-height: 1.5;">{decision['approval_reason']}</div>
 </div>
                 """, unsafe_allow_html=True)
             else:
@@ -3585,11 +3595,11 @@ with tab_dashboard:
                 # chối + PENDING APPROVAL).
                 st.session_state.founder_decision = "Chưa quyết định"
                 st.markdown(f"""
-<div class="dash-container" style="background: #fef2f2; border: 2px solid #ef4444; border-radius: 16px; padding: 24px; display: flex; align-items: center; gap: 20px; margin-bottom: 15px;">
-<div style="font-size: 2.5rem; color: #ef4444; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; background: #fee2e2; border-radius: 50%; flex-shrink: 0;">❗</div>
+<div class="dash-container" style="background: var(--danger-soft); border: 1px solid #f3c6c0; border-radius: var(--radius); padding: 24px; display: flex; align-items: center; gap: 20px; margin-bottom: 15px; box-shadow: var(--shadow);">
+<div style="font-size: 2.2rem; color: var(--danger); width: 72px; height: 72px; display: flex; align-items: center; justify-content: center; background: #ffffff; border: 1px solid #f3c6c0; border-radius: 50%; flex-shrink: 0;">❗</div>
 <div>
-<div style="font-size: 1.25rem; font-weight: 800; color: #b91c1c; letter-spacing: 0.05em; margin-bottom: 4px;">YÊU CẦU BỔ SUNG THÊM THÔNG TIN</div>
-<div style="font-size: 0.95rem; color: #991b1b; line-height: 1.5;">Founder chưa thể phê duyệt vì hồ sơ còn thiếu dữ liệu bắt buộc: <strong>{', '.join(result['missing_fields'])}</strong>. Vui lòng bổ sung rồi chạy lại Multi-Agent.</div>
+<div style="font-size: 1.15rem; font-weight: 800; color: var(--danger); letter-spacing: 0.03em; margin-bottom: 4px;">YÊU CẦU BỔ SUNG THÊM THÔNG TIN</div>
+<div style="font-size: 0.95rem; color: var(--danger); line-height: 1.5;">Founder chưa thể phê duyệt vì hồ sơ còn thiếu dữ liệu bắt buộc: <strong>{', '.join(result['missing_fields'])}</strong>. Vui lòng bổ sung rồi chạy lại Multi-Agent.</div>
 </div>
 </div>
                 """, unsafe_allow_html=True)
@@ -3601,11 +3611,11 @@ with tab_dashboard:
                 st.markdown("""
                 <style>
                 div[data-testid="column"] button {
-                    height: 50px;
-                    font-size: 1.1rem !important;
+                    height: 46px;
+                    font-size: 0.95rem !important;
                     font-weight: 700 !important;
-                    border-radius: 12px !important;
-                    transition: all 0.2s;
+                    border-radius: var(--radius-sm) !important;
+                    transition: all 0.15s ease;
                 }
                 </style>
                 """, unsafe_allow_html=True)
@@ -3625,31 +3635,31 @@ with tab_dashboard:
 
                 if founder_decision == "✅ Phê duyệt (Approve)":
                     st.markdown("""
-<div class="dash-container" style="background: linear-gradient(135deg, #10b981, #059669); padding: 24px; border-radius: 16px; color: white; display: flex; align-items: center; gap: 20px; box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.4); margin-bottom: 15px;">
-<div style="font-size: 3rem; background: rgba(255,255,255,0.2); width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; border-radius: 50%; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">✅</div>
+<div class="dash-container" style="background: #137a52; padding: 22px 24px; border-radius: var(--radius); color: white; display: flex; align-items: center; gap: 20px; box-shadow: var(--shadow); margin-bottom: 15px;">
+<div style="font-size: 2.4rem; background: rgba(255,255,255,0.16); width: 68px; height: 68px; display: flex; align-items: center; justify-content: center; border-radius: 50%;">✅</div>
 <div>
-<div style="font-size: 1.5rem; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 4px;">APPROVED</div>
+<div style="font-size: 1.3rem; font-weight: 800; letter-spacing: 0.03em; margin-bottom: 4px;">APPROVED</div>
 <div style="font-size: 0.95rem; opacity: 0.95;">Decision Card đã được ký. Hợp đồng chính thức có hiệu lực và được phép triển khai.</div>
 </div>
 </div>
                     """, unsafe_allow_html=True)
                 elif founder_decision == "❌ Từ chối (Reject)":
                     st.markdown("""
-<div class="dash-container" style="background: linear-gradient(135deg, #ef4444, #be123c); padding: 24px; border-radius: 16px; color: white; display: flex; align-items: center; gap: 20px; box-shadow: 0 10px 15px -3px rgba(239, 68, 68, 0.4); margin-bottom: 15px;">
-<div style="font-size: 3rem; background: rgba(255,255,255,0.2); width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; border-radius: 50%; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">❌</div>
+<div class="dash-container" style="background: #b42318; padding: 22px 24px; border-radius: var(--radius); color: white; display: flex; align-items: center; gap: 20px; box-shadow: var(--shadow); margin-bottom: 15px;">
+<div style="font-size: 2.4rem; background: rgba(255,255,255,0.16); width: 68px; height: 68px; display: flex; align-items: center; justify-content: center; border-radius: 50%;">❌</div>
 <div>
-<div style="font-size: 1.5rem; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 4px;">REJECTED</div>
+<div style="font-size: 1.3rem; font-weight: 800; letter-spacing: 0.03em; margin-bottom: 4px;">REJECTED</div>
 <div style="font-size: 0.95rem; opacity: 0.95;">Founder đã từ chối. Hợp đồng bị hủy bỏ và không được phép tiến hành.</div>
 </div>
 </div>
                     """, unsafe_allow_html=True)
                 else:
                     st.markdown("""
-<div class="dash-container" style="background: #f8fafc; border: 2px dashed #cbd5e1; padding: 24px; border-radius: 16px; display: flex; align-items: center; gap: 20px; margin-bottom: 15px;">
-<div style="font-size: 2.5rem; color: #94a3b8; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; background: #f1f5f9; border-radius: 50%;">⏳</div>
+<div class="dash-container" style="background: var(--surface-muted); border: 1px dashed var(--line-strong); padding: 24px; border-radius: var(--radius); display: flex; align-items: center; gap: 20px; margin-bottom: 15px;">
+<div style="font-size: 2.2rem; color: var(--subtle); width: 68px; height: 68px; display: flex; align-items: center; justify-content: center; background: var(--surface); border-radius: 50%;">⏳</div>
 <div>
-<div style="font-size: 1.25rem; font-weight: 800; color: #475569; letter-spacing: 0.05em; margin-bottom: 4px;">PENDING APPROVAL</div>
-<div style="font-size: 0.95rem; color: #64748b;">Đang chờ Founder xem xét các chỉ số và đưa ra quyết định cuối cùng...</div>
+<div style="font-size: 1.15rem; font-weight: 800; color: var(--muted); letter-spacing: 0.03em; margin-bottom: 4px;">PENDING APPROVAL</div>
+<div style="font-size: 0.95rem; color: var(--muted);">Đang chờ Founder xem xét các chỉ số và đưa ra quyết định cuối cùng...</div>
 </div>
 </div>
                     """, unsafe_allow_html=True)
@@ -3705,7 +3715,7 @@ st.markdown('''
     font-family: 'Inter', sans-serif;
     font-weight: 900;
     font-size: 1.25rem;
-    background: linear-gradient(270deg, #3b82f6, #8b5cf6, #ec4899, #3b82f6);
+    background: linear-gradient(270deg, #3730a3, #4f46e5, #818cf8, #3730a3);
     background-size: 300% 300%;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -3749,8 +3759,8 @@ st.markdown('''
         <svg class="newbie-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="url(#grad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <defs>
                 <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:#ec4899;stop-opacity:1" />
+                    <stop offset="0%" style="stop-color:#4f46e5;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#818cf8;stop-opacity:1" />
                 </linearGradient>
             </defs>
             <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
@@ -3761,6 +3771,3 @@ st.markdown('''
     </div>
 </div>
 ''', unsafe_allow_html=True)
-
-
-
