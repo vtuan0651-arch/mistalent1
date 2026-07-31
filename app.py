@@ -2312,9 +2312,9 @@ with st.sidebar:
     api_key = api_key_input.strip() or OPENAI_API_KEY_HARDCODED.strip() or env_key
     model = st.text_input(
         "Model",
-        value="gpt-4o-mini",
+        value="model="gpt-5"",
         key="model_input_v4",
-        help="Model OpenAI hỗ trợ Structured Outputs, ví dụ: gpt-4o-mini, gpt-4o, gpt-4.1, gpt-4.1-mini.",
+        help="Model OpenAI hỗ trợ Structured Outputs, ví dụ: gpt-5, gpt-5-mini,gpt-4o-mini, gpt-4o, gpt-4.1, gpt-4.1-mini.",
     )
     st.info("API key không được ghi vào Excel, prompt log hoặc Decision Card.")
 
