@@ -1995,14 +1995,45 @@ st.markdown(
    dùng ở nhiều nơi trong app nhưng trước đây chưa được import). */
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700;800;900&display=swap');
 
+:root {
+    --brand-blue: #2563eb;
+    --brand-indigo: #4f46e5;
+    --brand-violet: #7c3aed;
+    --brand-pink: #db2777;
+    --ink-900: #0f172a;
+    --ink-700: #334155;
+    --ink-500: #64748b;
+    --surface: #ffffff;
+    --surface-soft: #f8fafc;
+    --border-soft: #e2e8f0;
+}
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #c7d2fe #f1f5f9;
+}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #93c5fd, #a5b4fc);
+    border-radius: 10px;
+    border: 2px solid #f1f5f9;
+}
+::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #60a5fa, #818cf8); }
+
 html, body, [class*="css"] {
     font-family: 'Outfit', sans-serif !important;
     color: #1e293b !important;
 }
 
-/* Nền tảng tổng thể - Gradient nhẹ nhàng */
+/* Nền tảng tổng thể — mesh gradient nhẹ nhàng, nhiều lớp, cố định theo viewport */
 .stApp {
-    background: linear-gradient(135deg, #f0f4fd 0%, #ffffff 100%);
+    background:
+        radial-gradient(circle at 8% 8%, rgba(99, 102, 241, 0.10) 0%, rgba(99, 102, 241, 0) 38%),
+        radial-gradient(circle at 92% 4%, rgba(236, 72, 153, 0.09) 0%, rgba(236, 72, 153, 0) 35%),
+        radial-gradient(circle at 85% 92%, rgba(59, 130, 246, 0.10) 0%, rgba(59, 130, 246, 0) 40%),
+        linear-gradient(180deg, #f5f7fe 0%, #ffffff 55%, #f8fafc 100%);
+    background-attachment: fixed;
     color: #1e293b;
 }
 
@@ -2078,7 +2109,7 @@ input::placeholder, textarea::placeholder {
 
 .block-container {
     padding-top: 1.5rem;
-    padding-bottom: 2rem;
+    padding-bottom: 3rem;
     max-width: 95% !important;
 }
 
@@ -2089,15 +2120,26 @@ input::placeholder, textarea::placeholder {
     100% { transform: translateY(0px); }
 }
 
+/* Sidebar — nền mềm mại, chữ tối màu, nổi bật hơn phần nội dung chính */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    border-right: 1px solid #e2e8f0;
+    box-shadow: 2px 0 24px rgba(15, 23, 42, 0.03);
+}
+
+section[data-testid="stSidebar"] .block-container {
+    padding-top: 2rem;
+}
+
 /* Agent Card - Glassmorphism & Hover */
 .agent-card {
-    background: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.78);
     backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.6);
     border-radius: 16px;
     padding: 20px;
     margin-bottom: 16px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04);
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     position: relative;
     overflow: hidden;
@@ -2105,8 +2147,8 @@ input::placeholder, textarea::placeholder {
 
 .agent-card:hover {
     transform: translateY(-3px);
-    box-shadow: 0 8px 30px rgba(43, 88, 255, 0.08);
-    border-color: rgba(43, 88, 255, 0.2);
+    box-shadow: 0 10px 34px rgba(43, 88, 255, 0.10);
+    border-color: rgba(43, 88, 255, 0.25);
 }
 
 .agent-card::before {
@@ -2156,25 +2198,55 @@ input::placeholder, textarea::placeholder {
     border: none !important;
     border-radius: 10px;
     font-weight: 600;
-    padding: 0.5rem 1rem;
-    transition: all 0.3s ease !important;
-    box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+    padding: 0.5rem 1.1rem;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow: 0 4px 15px rgba(37, 99, 235, 0.28);
+    letter-spacing: 0.01em;
 }
 
 .stButton > button:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+    box-shadow: 0 8px 22px rgba(37, 99, 235, 0.38);
+    filter: brightness(1.04);
 }
 
 .stButton > button:active {
-    transform: translateY(1px);
+    transform: translateY(1px) scale(0.99);
 }
 
-/* Inputs & Selectboxes */
-.stTextInput > div > div > input, 
-.stSelectbox > div > div > div {
-    border-radius: 8px !important;
-    border: 1px solid #e5e7eb !important;
+.stButton > button[kind="secondary"] {
+    background: #ffffff;
+    color: #334155 !important;
+    border: 1.5px solid #e2e8f0 !important;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.stButton > button[kind="secondary"]:hover {
+    border-color: #94a3b8 !important;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+/* Form submit button (Chạy Multi-Agent) — nhấn mạnh hơn */
+.stFormSubmitButton > button {
+    background: linear-gradient(135deg, #2563eb, #7c3aed) !important;
+    font-size: 1.05rem !important;
+    padding: 0.75rem 1.25rem !important;
+    box-shadow: 0 8px 24px rgba(79, 70, 229, 0.32) !important;
+}
+
+.stFormSubmitButton > button:hover {
+    box-shadow: 0 10px 28px rgba(79, 70, 229, 0.42) !important;
+}
+
+/* Inputs, Selectboxes, Number/Date inputs, Textarea */
+.stTextInput > div > div > input,
+.stNumberInput > div > div > input,
+.stDateInput > div > div > input,
+.stTextArea textarea,
+.stSelectbox > div > div > div,
+.stMultiSelect > div > div {
+    border-radius: 10px !important;
+    border: 1.5px solid #e5e7eb !important;
     background-color: #ffffff !important;
     color: #0f172a !important;
     font-weight: 500 !important;
@@ -2183,16 +2255,57 @@ input::placeholder, textarea::placeholder {
 }
 
 .stTextInput > div > div > input:focus,
-.stSelectbox > div > div > div:focus {
+.stNumberInput > div > div > input:focus,
+.stDateInput > div > div > input:focus,
+.stTextArea textarea:focus,
+.stSelectbox > div > div > div:focus-within {
     border-color: #3b82f6 !important;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+}
+
+/* Multiselect tags */
+.stMultiSelect span[data-baseweb="tag"] {
+    background: linear-gradient(135deg, #4f46e5, #7c3aed) !important;
+    border-radius: 7px !important;
+}
+
+/* Form container — khung nhẹ bao quanh toàn bộ form nhập liệu */
+div[data-testid="stForm"] {
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
+    padding: 22px 22px 10px 22px;
+    box-shadow: 0 4px 18px rgba(15, 23, 42, 0.03);
+}
+
+/* File uploader */
+[data-testid="stFileUploaderDropzone"] {
+    background: linear-gradient(180deg, #f8fafc, #eef2ff) !important;
+    border: 1.5px dashed #a5b4fc !important;
+    border-radius: 14px !important;
+    transition: all 0.2s ease;
+}
+
+[data-testid="stFileUploaderDropzone"]:hover {
+    border-color: #6366f1 !important;
+    background: linear-gradient(180deg, #eef2ff, #e0e7ff) !important;
 }
 
 /* Metrics */
+div[data-testid="stMetric"] {
+    background: linear-gradient(145deg, #ffffff, #f8faff);
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 14px 18px;
+    box-shadow: 0 3px 12px rgba(15, 23, 42, 0.03);
+}
+
 div[data-testid="stMetricValue"] {
-    font-size: 2rem !important;
-    font-weight: 400 !important;
-    color: #1e3a8a !important;
+    font-size: 1.9rem !important;
+    font-weight: 700 !important;
+    background: linear-gradient(135deg, #1e3a8a, #4f46e5);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
 div[data-testid="stMetricLabel"] {
@@ -2200,7 +2313,7 @@ div[data-testid="stMetricLabel"] {
     color: #64748b !important;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    font-size: 0.85rem !important;
+    font-size: 0.8rem !important;
 }
 
 /* Dataframes */
@@ -2209,6 +2322,24 @@ div[data-testid="stMetricLabel"] {
     overflow: hidden;
     box-shadow: 0 4px 12px rgba(0,0,0,0.05);
     border: 1px solid #f1f5f9;
+}
+
+/* Expander — bo tròn, viền mềm, nổi khối rõ ràng */
+[data-testid="stExpander"] {
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 14px !important;
+    background: rgba(255, 255, 255, 0.7);
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.03);
+    overflow: hidden;
+}
+
+[data-testid="stExpander"] summary {
+    padding: 4px 2px;
+}
+
+/* Alerts (success / info / warning / error) — bo tròn nhất quán */
+div[data-testid="stAlertContainer"], .stAlert {
+    border-radius: 12px !important;
 }
 
 /* Muted text */
@@ -2231,7 +2362,7 @@ div[data-testid="stMetricLabel"] {
 )
 
 st.markdown("""
-<div style="text-align: center; margin-top: 10px; margin-bottom: 30px; position: relative; z-index: 50;">
+<div style="text-align: center; margin-top: 6px; margin-bottom: 34px; position: relative; z-index: 50;">
     <div style="
         display: inline-flex;
         align-items: center;
@@ -2240,7 +2371,7 @@ st.markdown("""
         background: rgba(255, 255, 255, 0.85);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
-        padding: 12px 36px;
+        padding: 14px 40px;
         border-radius: 999px;
         box-shadow: 0 8px 30px rgba(59, 130, 246, 0.12), inset 0 2px 4px rgba(255,255,255,0.8);
         border: 1px solid rgba(226, 232, 240, 0.9);
@@ -2251,7 +2382,7 @@ st.markdown("""
         <h1 style="
             margin: 0;
             font-family: 'Inter', sans-serif;
-            font-size: 2rem;
+            font-size: 2.05rem;
             font-weight: 900;
             background: linear-gradient(90deg, #1e3a8a, #3b82f6, #8b5cf6, #ec4899);
             background-size: 200% auto;
@@ -2264,15 +2395,22 @@ st.markdown("""
         </h1>
     </div>
     <div style="
-        font-family: 'Inter', sans-serif;
-        font-size: 0.95rem;
-        color: #64748b;
-        margin-top: 20px;
-        font-weight: 600;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 22px;
     ">
-        Team Pack (CSV) <span style="color: #3b82f6">→</span> Finance Agent <span style="color: #3b82f6">→</span> Risk Agent <span style="color: #3b82f6">→</span> Decision Agent <span style="color: #3b82f6">→</span> Founder Approval
+        <span class="flow-chip">📦 Team Pack (CSV)</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-chip">💰 Finance Agent</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-chip">🛡️ Risk Agent</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-chip">🧭 Decision Agent</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-chip flow-chip-final">✅ Founder Approval</span>
     </div>
 </div>
 
@@ -2294,6 +2432,34 @@ st.markdown("""
 }
 .hero-title-box:hover {
     transform: scale(1.02);
+}
+.flow-chip {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #334155;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    padding: 7px 14px;
+    border-radius: 999px;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+    transition: all 0.2s ease;
+}
+.flow-chip:hover {
+    transform: translateY(-2px);
+    border-color: #93c5fd;
+    box-shadow: 0 6px 14px rgba(59, 130, 246, 0.14);
+}
+.flow-chip-final {
+    background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+    border-color: #6ee7b7;
+    color: #065f46;
+}
+.flow-arrow {
+    color: #93a7f0;
+    font-weight: 700;
+    font-size: 0.95rem;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -2324,36 +2490,43 @@ st.markdown("""
 <style>
 /* Khung bao quanh thanh tab chính, giúp tab nổi bật và rõ ràng hơn */
 div[data-testid="stTabs"] {
-    background: #f8fafc;
-    border: 2px solid #e2e8f0;
-    border-radius: 16px;
+    background: linear-gradient(180deg, #f8fafc, #f1f5f9);
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
     padding: 10px 14px 0 14px;
-    margin-bottom: 18px;
-    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+    margin-bottom: 22px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
 }
 
 div[data-testid="stTabs"] button[data-baseweb="tab"] {
     height: 56px;
     padding: 0 22px;
-    font-size: 1.15rem !important;
+    font-size: 1.1rem !important;
     font-weight: 700 !important;
-    color: #475569;
-    border-radius: 10px 10px 0 0;
+    color: #64748b;
+    border-radius: 12px 12px 0 0;
+    transition: all 0.2s ease;
+}
+
+div[data-testid="stTabs"] button[data-baseweb="tab"]:hover {
+    color: #4f46e5;
+    background: rgba(99, 102, 241, 0.06);
 }
 
 div[data-testid="stTabs"] button[data-baseweb="tab"] p {
-    font-size: 1.15rem !important;
+    font-size: 1.1rem !important;
     font-weight: 700 !important;
 }
 
 div[data-testid="stTabs"] button[aria-selected="true"] {
-    color: #b91c1c !important;
+    color: #4338ca !important;
     background: #ffffff;
-    border-bottom: 4px solid #ef4444 !important;
+    border-bottom: 4px solid #6366f1 !important;
+    box-shadow: 0 -4px 14px rgba(99, 102, 241, 0.08);
 }
 
 div[data-testid="stTabs"] [data-baseweb="tab-highlight"] {
-    background-color: #ef4444 !important;
+    background: linear-gradient(90deg, #4f46e5, #ec4899) !important;
     height: 4px !important;
 }
 
