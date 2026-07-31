@@ -1339,6 +1339,651 @@ def evaluate_api_handling_checklist(
     return checks
 
 
+# 7.6 CRISIS CARD — MVP1, MVP2, MVP3, MVP5 (MODELS & LOGIC)
+# ============================================================
+
+class CrisisCardInput(BaseModel):
+    crisis_group: list[Literal[
+        "DEADLINE_EARLY", "DEADLINE_LATE",
+        "COST_CHANGE",
+        "PAYMENT_DELAY",
+        "FINANCE_CONDITION",
+        "SCOPE_CHANGE", "ORDER_CHANGE",
+    ]] = Field(max_length=2)
+    contract_id: str
+    days_deviation: Optional[int] = None
+    extra_cost_amount: Optional[float] = None
+    late_amount: Optional[float] = None
+    late_month: Optional[str] = None
+    late_days: Optional[int] = None
+    new_annual_rate_or_fee: Optional[float] = None
+    new_processing_fee_rate: Optional[float] = None
+    new_collateral_ratio: Optional[float] = None
+    new_num_provinces: Optional[int] = None
+    new_order_count: Optional[int] = None
+    raw_prompt_text: Optional[str] = None
+
+def validate_crisis_card_input(crisis: CrisisCardInput) -> list[str]:
+    errors = []
+    if not crisis.crisis_group:
+        errors.append("Cần chọn ít nhất một nhóm biến động.")
+    # FIX (bug logic thực sự): DEADLINE_EARLY và DEADLINE_LATE dùng chung 1 trường
+    # days_deviation duy nhất trên form -- không thể vừa giao sớm vừa giao muộn
+    # cùng lúc trên cùng một hợp đồng, nếu chọn cả 2 thì công thức sẽ bị cộng dồn
+    # vô nghĩa (áp cả 2 chiều lên cùng 1 số ngày). Chặn ngay từ bước validate.
+    if "DEADLINE_EARLY" in crisis.crisis_group and "DEADLINE_LATE" in crisis.crisis_group:
+        errors.append("Không thể chọn đồng thời Giao sớm và Giao muộn cho cùng một biến động (mâu thuẫn về tiến độ).")
+    if any(g in ["DEADLINE_EARLY", "DEADLINE_LATE"] for g in crisis.crisis_group) and not crisis.days_deviation:
+        errors.append("Cần nhập số ngày sớm/muộn cho biến động tiến độ.")
+    if "COST_CHANGE" in crisis.crisis_group and not crisis.extra_cost_amount:
+        errors.append("Cần nhập chi phí phát sinh.")
+    # FIX (theo yêu cầu bổ sung): late_month giờ là tùy chọn — nếu Founder không
+    # nhập tháng cụ thể, hệ thống tự áp dụng vào tháng ĐẦU của lịch dòng tiền hợp
+    # đồng (xem project_closing_cash_with_crisis). Chỉ còn late_amount và
+    # late_days là bắt buộc.
+    if "PAYMENT_DELAY" in crisis.crisis_group and (not crisis.late_amount or not crisis.late_days):
+        errors.append("Cần nhập số tiền chậm thanh toán và số ngày trả muộn.")
+    if "FINANCE_CONDITION" in crisis.crisis_group:
+        if crisis.new_annual_rate_or_fee is None and crisis.new_processing_fee_rate is None and crisis.new_collateral_ratio is None:
+            errors.append("Cần nhập ít nhất một thay đổi điều kiện tài chính.")
+    if "SCOPE_CHANGE" in crisis.crisis_group and not crisis.new_num_provinces:
+        errors.append("Cần nhập số tỉnh/thành phố mới.")
+    if "ORDER_CHANGE" in crisis.crisis_group and not crisis.new_order_count:
+        errors.append("Cần nhập số lượng đơn hàng mới.")
+    return errors
+
+class CrisisDelta(BaseModel):
+    extra_oper: float = 0.0
+    extra_estimated_cost: float = 0.0
+    extra_list_price: float = 0.0
+    payment_shift: Optional[dict] = None
+    trigger_layer: Optional[Literal["L1","L2","L3","L4"]] = None
+    # FIX (bug nghiêm trọng): trước đây vượt trần order raise ValueError khiến cả
+    # luồng Crisis crash (except Exception chung ở UI chỉ hiện "Lỗi hệ thống",
+    # không trả về Decision Card nào). Nay chuyển sang cờ tất định để UI tự xử lý
+    # thành 1 quyết định TERMINATE rõ ràng thay vì crash.
+    hard_cap_exceeded: bool = False
+    note: str
+
+class CrisisDecisionCardOutput(BaseModel):
+    continue_contract: Literal["CONTINUE", "CONTINUE_WITH_CONDITIONS", "TERMINATE"]
+    financing_plan: str
+    key_protection_condition: str
+    gross_margin_after: float
+    closing_cash_after: float
+    funding_amount_after: float
+    executive_summary: str
+
+CRISIS_RISK_LEVEL_ORDER = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+
+
+def derive_risk_level_from_triggered_rules(triggered_rules: list[dict]) -> str:
+    severities = {
+        str(rule.get("severity", "")).strip().upper()
+        for rule in (triggered_rules or [])
+    }
+    if "CRITICAL" in severities:
+        return "CRITICAL"
+    if "HIGH" in severities:
+        return "HIGH"
+    if "MEDIUM" in severities:
+        return "MEDIUM"
+    return "LOW"
+
+
+def adjust_crisis_risk_level_by_financial_delta(
+    base_risk_level: str,
+    before_min_closing_cash: float,
+    after_min_closing_cash: float,
+    before_requested_amount: float,
+    after_requested_amount: float,
+    triggered_rules: list[dict],
+) -> str:
+    """Điều chỉnh risk level theo biến động tài chính trong Crisis.
+
+    Rule:
+    - Nếu closing cash tăng VÀ nhu cầu vay giảm -> hạ 1 mức risk (trừ khi còn Critical).
+    - Nếu closing cash giảm VÀ nhu cầu vay tăng -> nâng 1 mức risk.
+    - Các trường hợp còn lại giữ nguyên base_risk_level.
+    """
+    normalized_base = str(base_risk_level or "LOW").strip().upper()
+    if normalized_base not in CRISIS_RISK_LEVEL_ORDER:
+        normalized_base = derive_risk_level_from_triggered_rules(triggered_rules)
+
+    epsilon = 1e-6
+    improved_cash = (after_min_closing_cash - before_min_closing_cash) > epsilon
+    reduced_funding_need = (before_requested_amount - after_requested_amount) > epsilon
+    worsened_cash = (before_min_closing_cash - after_min_closing_cash) > epsilon
+    increased_funding_need = (after_requested_amount - before_requested_amount) > epsilon
+
+    severities = {
+        str(rule.get("severity", "")).strip().upper()
+        for rule in (triggered_rules or [])
+    }
+    has_critical = "CRITICAL" in severities
+    level_index = CRISIS_RISK_LEVEL_ORDER.index(normalized_base)
+
+    if improved_cash and reduced_funding_need and not has_critical:
+        return CRISIS_RISK_LEVEL_ORDER[max(0, level_index - 1)]
+
+    if worsened_cash and increased_funding_need:
+        return CRISIS_RISK_LEVEL_ORDER[min(len(CRISIS_RISK_LEVEL_ORDER) - 1, level_index + 1)]
+
+    return normalized_base
+
+def resolve_crisis_deltas(crisis: CrisisCardInput, list_price_goc: float, old_num_provinces: Optional[int] = None) -> CrisisDelta:
+    extra_oper = 0.0
+    extra_estimated_cost = 0.0
+    extra_list_price = 0.0
+    payment_shift = None
+    trigger_layer = None
+    hard_cap_exceeded = False
+    notes = []
+
+    for group in crisis.crisis_group:
+        if group == "DEADLINE_EARLY":
+            if crisis.days_deviation and crisis.days_deviation > 7:
+                extra_oper += 0.01
+                extra_list_price += list_price_goc * 0.015
+                notes.append(f"Giao sớm {crisis.days_deviation} ngày (>7 ngày): oper +1%, list price +1.5%")
+            elif crisis.days_deviation and crisis.days_deviation > 0:
+                extra_oper += 0.005
+                extra_list_price += list_price_goc * 0.01
+                notes.append(f"Giao sớm {crisis.days_deviation} ngày (<7 ngày): oper +0.5%, list price +1%")
+        elif group == "DEADLINE_LATE":
+            if crisis.days_deviation and crisis.days_deviation > 7:
+                extra_oper += 0.005
+                extra_estimated_cost += list_price_goc * 0.015
+                notes.append(f"Giao muộn {crisis.days_deviation} ngày (>7 ngày): oper +0.5%, estimated cost +1.5% giá trị HĐ")
+            elif crisis.days_deviation and crisis.days_deviation > 0:
+                extra_oper += 0.0005
+                extra_estimated_cost += list_price_goc * 0.01
+                notes.append(f"Giao muộn {crisis.days_deviation} ngày (<7 ngày): oper +0.05%, estimated cost +1% giá trị HĐ")
+        elif group == "COST_CHANGE":
+            extra_estimated_cost += crisis.extra_cost_amount or 0.0
+            notes.append(f"Phát sinh chi phí: +{crisis.extra_cost_amount or 0.0} VNĐ")
+        elif group == "PAYMENT_DELAY":
+            if crisis.late_amount and crisis.late_days:
+                # Lãi kép 1%/ngày trên số tiền chậm trả (đúng docx mục 3):
+                # số tiền phải trả cuối cùng = late_amount * (1 + 1%)^late_days.
+                daily_rate = 0.01
+                compound_multiplier = (1 + daily_rate) ** crisis.late_days
+                surcharge_pct = compound_multiplier - 1
+                # FIX (theo yêu cầu bổ sung): late_month là tùy chọn — nếu Founder
+                # không nhập, để None ở đây; project_closing_cash_with_crisis() sẽ
+                # tự phân giải thành tháng ĐẦU của lịch dòng tiền hợp đồng.
+                payment_shift = {
+                    "late_amount": crisis.late_amount,
+                    "late_month": crisis.late_month.strip() if crisis.late_month and crisis.late_month.strip() else None,
+                    "late_days": crisis.late_days,
+                    "surcharge_pct": surcharge_pct,
+                }
+                month_label = payment_shift["late_month"] or "tháng đầu hợp đồng (mặc định do không nhập tháng cụ thể)"
+                notes.append(
+                    f"Khách hàng trả muộn {crisis.late_amount} VNĐ vào {month_label}, "
+                    f"chậm {crisis.late_days} ngày -> lãi kép 1%/ngày = +{surcharge_pct:.2%} "
+                    "(chuyển gốc + lãi sang tháng sau)"
+                )
+        elif group == "SCOPE_CHANGE":
+            # BUG cũ: cộng thẳng toàn bộ hệ số quy mô MỚI lên oper baseline, trong khi
+            # oper baseline (build_finance_metrics) ĐÃ có sẵn hệ số quy mô CŨ (tính từ
+            # num_provinces gốc của hợp đồng) -> bị tính trùng 2 lần phần quy mô. Sửa:
+            # chỉ cộng phần CHÊNH LỆCH (mới - cũ) để hệ số quy mô mới THAY THẾ đúng
+            # hệ số cũ, không cộng dồn lên nó.
+            old_scale, _old_breakdown = compute_scale_coefficient(old_num_provinces)
+            new_scale, breakdown = compute_scale_coefficient(crisis.new_num_provinces)
+            net_scale_delta = new_scale - old_scale
+            extra_oper += net_scale_delta
+            notes.append(
+                (breakdown["tieu_chi"] if breakdown else f"Đổi địa bàn -> {crisis.new_num_provinces} tỉnh/thành")
+                + f" (thay hệ số quy mô cũ {old_scale:.2%} bằng hệ số mới {new_scale:.2%}, "
+                f"net delta {net_scale_delta:+.2%})"
+            )
+        elif group == "ORDER_CHANGE":
+            ORDER_FREE_LIMIT = 2
+            ORDER_SURCHARGE_OPER = 0.005
+            # LƯU Ý: docx chỉ nói "có giới hạn mức trần order (khả năng của OPC)"
+            # nhưng KHÔNG nêu con số cụ thể -> 10 là ngưỡng TẠM ĐẶT, cần Founder
+            # xác nhận lại. Ngưỡng này được ghi rõ vào note/UI (thay vì raise
+            # Exception làm crash toàn bộ luồng xử lý Crisis Card) để Founder nhìn
+            # thấy và có thể chỉnh sửa nếu số này chưa đúng.
+            ORDER_HARD_CAP = 10
+            if crisis.new_order_count:
+                if crisis.new_order_count > ORDER_HARD_CAP:
+                    # FIX (bug nghiêm trọng): trước đây raise ValueError ở đây khiến
+                    # toàn bộ luồng Crisis Card bị except Exception chung ở UI bắt và
+                    # chỉ hiện "Lỗi hệ thống" -- không có Decision Card, không trả lời
+                    # được câu hỏi bắt buộc "có tiếp tục hợp đồng không / phương án
+                    # tài chính / điều kiện bảo vệ" theo đúng yêu cầu. Nay set cờ tất
+                    # định để tầng UI tự dựng 1 Decision Card TERMINATE rõ ràng.
+                    hard_cap_exceeded = True
+                    notes.append(
+                        f"Số order mới ({crisis.new_order_count}) VƯỢT TRẦN CỨNG "
+                        f"({ORDER_HARD_CAP} - ngưỡng tạm đặt, cần Founder xác nhận lại "
+                        "con số này) -> không thể tiếp tục theo điều kiện hiện tại."
+                    )
+                elif crisis.new_order_count > ORDER_FREE_LIMIT:
+                    extra_oper += ORDER_SURCHARGE_OPER
+                    notes.append(f"Vượt {ORDER_FREE_LIMIT} order (số order: {crisis.new_order_count}): oper +{ORDER_SURCHARGE_OPER}")
+                else:
+                    notes.append(f"Số order mới: {crisis.new_order_count} (trong hạn mức miễn phí)")
+            else:
+                notes.append("Số order không đổi")
+        elif group == "FINANCE_CONDITION":
+            changed_fields = [
+                field_name
+                for field_name, field_value in (
+                    ("annual_rate_or_fee", crisis.new_annual_rate_or_fee),
+                    ("processing_fee_rate", crisis.new_processing_fee_rate),
+                    ("collateral_ratio", crisis.new_collateral_ratio),
+                )
+                if field_value is not None
+            ]
+            # FIX (gây nhầm lẫn): trước đây note chỉ báo "L4" khi collateral_ratio đổi,
+            # dù annual_rate_or_fee/processing_fee_rate (Lớp 3) có đổi CÙNG LÚC hay
+            # không -> mất thông tin Lớp 3 cũng bị ảnh hưởng. Nay liệt kê ĐẦY ĐỦ các
+            # lớp bị ảnh hưởng trong note. trigger_layer (field Literal đơn giá trị)
+            # vẫn giữ đúng quy tắc cũ (ưu tiên lớp sâu nhất) để không đổi kiểu dữ liệu.
+            layer_by_field = {
+                "annual_rate_or_fee": "L3",
+                "processing_fee_rate": "L3",
+                "collateral_ratio": "L4",
+            }
+            affected_layers = sorted({layer_by_field[f] for f in changed_fields})
+            layers_label = "+".join(affected_layers) if affected_layers else "?"
+            trigger_layer = "L4" if "collateral_ratio" in changed_fields else "L3"
+            notes.append(
+                "Thay đổi điều kiện tài chính (" + ", ".join(changed_fields) + f") — re-filter từ lớp {layers_label}"
+            )
+
+    return CrisisDelta(
+        extra_oper=extra_oper,
+        extra_estimated_cost=extra_estimated_cost,
+        extra_list_price=extra_list_price,
+        payment_shift=payment_shift,
+        trigger_layer=trigger_layer,
+        hard_cap_exceeded=hard_cap_exceeded,
+        note="; ".join(notes)
+    )
+
+def build_finance_metrics_with_crisis(
+    selected_products: pd.DataFrame,
+    payment_reliability: Optional[float],
+    province: Optional[str],
+    transaction_risk_score: Optional[float],
+    order_date: pd.Timestamp,
+    due_date: pd.Timestamp,
+    num_provinces: Optional[int],
+    crisis_delta: CrisisDelta
+) -> dict:
+    metrics = build_finance_metrics(
+        selected_products, payment_reliability, province, 
+        transaction_risk_score, order_date, due_date, num_provinces
+    )
+    if crisis_delta:
+        metrics["oper_coefficient"] += crisis_delta.extra_oper
+        if crisis_delta.extra_oper != 0:
+            metrics["oper_breakdown"].append({"tieu_chi": f"Crisis: {crisis_delta.note}", "he_so": crisis_delta.extra_oper})
+        metrics["estimated_cost"] = metrics["baseline_estimate"] * (1 + metrics["oper_coefficient"]) + crisis_delta.extra_estimated_cost
+        metrics["total_list_price"] += crisis_delta.extra_list_price
+        if metrics["total_list_price"] > 0:
+            metrics["gross_margin"] = (metrics["total_list_price"] - metrics["estimated_cost"]) / metrics["total_list_price"]
+        else:
+            metrics["gross_margin"] = 0.0
+    return metrics
+
+def project_closing_cash_with_crisis(
+    data: dict[str, pd.DataFrame],
+    selected_products: pd.DataFrame,
+    finance_metrics: dict,
+    order_date: pd.Timestamp,
+    reserve_minimum: float,
+    crisis_delta: CrisisDelta
+) -> dict:
+    proj = project_closing_cash(data, selected_products, finance_metrics, order_date, reserve_minimum)
+    if not crisis_delta:
+        return proj
+        
+    schedule = proj["schedule"]
+    
+    if crisis_delta.extra_list_price != 0.0 and len(schedule) > 0:
+        schedule[0]["deal_cash_in"] += crisis_delta.extra_list_price
+        
+    if crisis_delta.payment_shift:
+        late_month = crisis_delta.payment_shift["late_month"]
+        # FIX (theo yêu cầu bổ sung): PAYMENT_DELAY áp dụng cho một tháng cụ thể
+        # nếu Founder có nhập; nếu KHÔNG nhập tháng, tự động mặc định là tháng
+        # ĐẦU TIÊN của lịch dòng tiền hợp đồng (schedule[0]) thay vì báo lỗi/bỏ
+        # qua âm thầm.
+        if not late_month and schedule:
+            late_month = schedule[0]["month"]
+        late_amount = crisis_delta.payment_shift["late_amount"]
+        surcharge = crisis_delta.payment_shift["surcharge_pct"]
+        shifted_amount = late_amount * (1 + surcharge)
+
+        matched = False
+        for i, row in enumerate(schedule):
+            if row["month"] == late_month:
+                matched = True
+                row["deal_cash_in"] -= late_amount
+                if i + 1 < len(schedule):
+                    # Đúng docx: dời gốc + lãi sang Cash In của tháng KẾ TIẾP.
+                    schedule[i + 1]["deal_cash_in"] += shifted_amount
+                else:
+                    # late_month là tháng CUỐI của lịch hợp đồng -> không còn "tháng tiếp
+                    # theo" để dời sang. Cộng lại (kèm lãi) vào chính tháng đó thay vì để
+                    # khoản tiền biến mất khỏi dòng tiền (vi phạm bảo toàn tiền mặt).
+                    row["deal_cash_in"] += shifted_amount
+                break
+
+        if not matched:
+            # late_month không khớp tháng nào trong lịch (VD sai định dạng "YYYY-MM") ->
+            # payment_shift coi như không áp dụng được. Ghi lại lý do vào note của proj
+            # để UI có thể cảnh báo, thay vì âm thầm bỏ qua.
+            proj["payment_shift_warning"] = (
+                f"Không tìm thấy tháng '{late_month}' trong lịch dòng tiền hợp đồng — "
+                "chưa áp dụng được biến động Payment Delay."
+            )
+
+    cumulative_deal_net = 0.0
+    if schedule:
+        prior_new_closing = schedule[0]["opening_cash"]
+        for i, row in enumerate(schedule):
+            cumulative_deal_net += row["deal_cash_in"] - row["deal_cash_out"]
+            row["opening_cash"] = prior_new_closing
+            row["projected_closing_cash"] = row["baseline_projected_closing_cash"] + cumulative_deal_net
+            prior_new_closing = row["projected_closing_cash"]
+            
+    min_closing_cash = min([r["projected_closing_cash"] for r in schedule]) if schedule else 0.0
+    breach = min_closing_cash < reserve_minimum
+    
+    proj["min_projected_closing_cash"] = round(min_closing_cash, 2)
+    proj["cash_reserve_breach"] = breach
+    return proj
+
+def rerun_partner_matrix_from_layer(
+    data: dict[str, pd.DataFrame],
+    funding_need: float,
+    cash_projection: dict,
+    crisis: CrisisCardInput,
+    baseline_partner_matrix: Optional[list[dict]] = None,
+) -> tuple[list[dict], Optional[str]]:
+    """
+    Nhóm FINANCE_CONDITION: đổi annual_rate_or_fee/processing_fee_rate/collateral_ratio
+    là kết quả ĐÀM PHÁN LẠI với đúng 1 gói vay/đối tác cụ thể đang tài trợ hợp đồng này —
+    KHÔNG áp dụng đồng loạt lên toàn bộ 11_BANK_PRODUCTS. BUG cũ: gán thẳng giá trị mới
+    cho CẢ CỘT (mọi ngân hàng/gói vay), khiến Lớp 3 ("so sánh tổng chi phí giữa các gói
+    vay") và Lớp 4 (collateral) mất hết ý nghĩa vì mọi gói đều bị ép về cùng 1 giá trị.
+
+    Xác định đúng gói vay cần đổi: gói eligible đứng đầu (tốt nhất) trong
+    baseline_partner_matrix của lượt chạy Operations trước — đây chính là gói đang thực
+    sự tài trợ hợp đồng. Chỉ override đúng dòng bank_product_id đó rồi build lại toàn bộ
+    Lớp 1-4 (Lớp 1-2 không đổi vì input của chúng không đổi, nên kết quả tương đương
+    đúng "chỉ lọc lại từ Lớp 3/4 trở đi").
+
+    FIX (bug logic thực sự): trước đây nếu KHÔNG xác định được đúng 1 gói vay để áp
+    thay đổi (VD hợp đồng gốc chưa vay gói nào -> baseline_partner_matrix không có
+    eligible=true), hàm ÂM THẦM bỏ qua toàn bộ thay đổi Founder vừa nhập, không có
+    bất kỳ cảnh báo nào hiển thị. Nay trả thêm 1 cảnh báo dạng text (phần tử thứ 2
+    của tuple) để tầng UI hiển thị rõ cho Founder biết thay đổi chưa được áp dụng.
+    """
+    data_copy = data.copy()
+    finance_condition_warning = None
+    if "FINANCE_CONDITION" in crisis.crisis_group:
+        products = data_copy["11_BANK_PRODUCTS"].copy()
+
+        target_product_id = None
+        if baseline_partner_matrix:
+            eligible_before = [item for item in baseline_partner_matrix if item.get("eligible")]
+            if eligible_before:
+                target_product_id = eligible_before[0].get("bank_product_id")
+
+        if target_product_id is not None:
+            mask = products["bank_product_id"] == target_product_id
+        else:
+            # Không xác định được đúng 1 gói vay cụ thể (VD hợp đồng gốc chưa có gói
+            # nào eligible) -> an toàn nhất là KHÔNG áp lên toàn bộ thị trường; giữ
+            # nguyên bảng gốc để tránh làm sai lệch dữ liệu của các gói khác.
+            mask = pd.Series([False] * len(products), index=products.index)
+            finance_condition_warning = (
+                "Không xác định được gói vay cụ thể đang tài trợ hợp đồng gốc (baseline "
+                "chưa có gói nào eligible=true) -> thay đổi annual_rate_or_fee/"
+                "processing_fee_rate/collateral_ratio vừa nhập CHƯA được áp dụng vào bất "
+                "kỳ gói vay nào trong 11_BANK_PRODUCTS."
+            )
+
+        if crisis.new_annual_rate_or_fee is not None:
+            products.loc[mask, "annual_rate_or_fee"] = crisis.new_annual_rate_or_fee
+        if crisis.new_processing_fee_rate is not None:
+            products.loc[mask, "processing_fee_rate"] = crisis.new_processing_fee_rate
+        if crisis.new_collateral_ratio is not None:
+            products.loc[mask, "collateral_ratio"] = crisis.new_collateral_ratio
+        data_copy["11_BANK_PRODUCTS"] = products
+        
+    return build_partner_matrix(data_copy, funding_need, cash_projection), finance_condition_warning
+
+
+def run_crisis_decision_agent(client: "OpenAI", model: str, payload: dict):
+    """
+    Hàm gọi OpenAI riêng cho Crisis Decision Agent (thay cho việc gọi
+    call_structured_agent() rải rác/inline ở UI trước đây) — mirror đúng cách tổ
+    chức run_finance_agent/run_risk_agent/run_decision_agent ở Mục 7, nhưng đặt ở
+    Mục 7.6 vì đây là 1 phần của logic Crisis Card, KHÔNG đụng tới Mục 7.
+
+    QUAN TRỌNG: key_protection_condition của Crisis Decision Card KHÔNG bị
+    enforce_crisis_decision_card() ghi đè — giữ nguyên đúng như Agent trả về.
+    continue_contract CŨNG được ưu tiên giữ theo Agent, TRỪ 1 trường hợp bắt buộc:
+    closing_cash_after < 0 VÀ không còn gói vay eligible nào (hoặc order vượt trần
+    cứng) — khi đó enforce_crisis_decision_card() sẽ ép cứng về TERMINATE bất kể
+    Agent trả lời gì, vì đây là quy tắc "BẮT BUỘC" theo nghiệp vụ, không thể chỉ
+    dựa vào việc Agent tuân thủ đúng prompt (LLM không đảm bảo tuân thủ 100%).
+    Vì vậy instructions dưới đây vẫn cần đủ chi tiết để Agent tự đưa ra 2 trường
+    này một cách có căn cứ — nhưng có 1 lưới an toàn tất định phía sau.
+    """
+    instructions = """
+Bạn là Decision & Partner Agent của OPC, chuyên xử lý Crisis Card (biến động phát
+sinh trên 1 hợp đồng đang chạy).
+
+Dữ liệu đầu vào (payload) gồm: crisis_context (nhóm biến động + delta đã tính),
+finance_metrics (SAU biến động), cash_projection (SAU biến động), partner_matrix
+(SAU biến động, đã lọc theo Mục 4), requested_amount, triggered_rules, risk_level,
+baseline_context, founder_approval_needed, finance_agent_output, risk_agent_output.
+
+Nhiệm vụ — trả về CrisisDecisionCardOutput gồm:
+1. continue_contract: chọn đúng 1 trong 3 giá trị:
+   - CONTINUE: chỉ số tài chính sau biến động vẫn an toàn (gross_margin >= 0.28,
+     closing_cash sau biến động >= 0, không có rủi ro nghiêm trọng mới phát sinh).
+   - CONTINUE_WITH_CONDITIONS: hợp đồng còn khả thi nhưng cần thêm điều kiện ràng
+     buộc/kiểm soát (VD: gross_margin giảm nhưng vẫn dương, cần huy động vốn ngoài,
+     cần đàm phán lại một phần điều khoản với khách hàng).
+   - TERMINATE: closing_cash sau biến động < 0 VÀ partner_matrix không có sản phẩm
+     nào eligible=true (không còn nguồn bù đắp) — trong trường hợp này BẮT BUỘC
+     chọn TERMINATE, không được chọn giá trị khác.
+2. financing_plan: nêu rõ phương án tài chính cụ thể áp dụng (vay gói nào trong
+   partner_matrix nếu eligible=true, hoặc "Không cần huy động vốn ngoài" nếu
+   partner_matrix rỗng/không sản phẩm nào eligible, hoặc phương án đàm phán lại
+   với khách hàng nếu không còn sản phẩm tín dụng khả thi).
+3. key_protection_condition: đúng 1 điều kiện bảo vệ/thương mại cụ thể nhất mà
+   Founder phải xác nhận trước khi áp dụng biến động này (VD: đặt cọc bổ sung,
+   giải ngân theo tiến độ, tài sản đảm bảo, đàm phán lại thời hạn thanh toán...).
+   Phải bám sát đúng crisis_context và triggered_rules được cung cấp, không chung
+   chung, không lặp lại nguyên văn financing_plan.
+4. gross_margin_after, closing_cash_after, funding_amount_after: PHẢI lấy đúng
+   nguyên giá trị Python đã cung cấp trong finance_metrics/cash_projection/
+   requested_amount — không tự tính lại, không làm tròn khác đi (các trường này
+   vẫn bị Python enforce lại sau, nhưng vẫn phải điền đúng ngay từ đầu).
+5. executive_summary: tóm tắt ngắn gọn bằng tiếng Việt về tác động của biến động
+   này lên hợp đồng và lý do đưa ra continue_contract ở trên.
+6. Risk level phải đánh giá đúng tình hình tài chính BEFORE/AFTER:
+   - Nếu closing_cash_after tăng và requested_amount_after giảm so với baseline_context
+     thì xu hướng risk phải giảm (trừ khi vẫn còn triggered rule severity Critical).
+   - Nếu closing_cash_after giảm và requested_amount_after tăng so với baseline_context
+     thì xu hướng risk phải tăng.
+   - Không tự đặt risk_level trái với triggered_rules/risk_level đã có trong payload.
+Quy tắc bắt buộc:
+- Không phát minh số liệu, sản phẩm tín dụng hay điều khoản ngoài payload.
+- Không tự đổi requested_amount hay eligible của partner_matrix.
+- Nếu founder_approval_needed=true, phải nêu rõ trong financing_plan hoặc
+  executive_summary rằng cần Founder phê duyệt.
+- Viết bằng tiếng Việt, ngắn gọn, đủ căn cứ để Founder ra quyết định ngay.
+"""
+    return call_structured_agent(
+        client, model, instructions, payload, CrisisDecisionCardOutput, "Crisis Decision Agent"
+    )
+
+
+# ------------------------------------------------------------------
+# FIX (nghiêm trọng): yêu cầu ghi rõ "Nhập dữ kiện Crisis Card bằng prompt HOẶC
+# biểu mẫu đơn giản". Trước đây CrisisCardInput đã có sẵn field raw_prompt_text
+# nhưng KHÔNG có bất kỳ nơi nào dùng nó -- chỉ có đường form. Bổ sung 1 Agent
+# OpenAI chuyên trích xuất Crisis Card từ mô tả tự do (đúng yêu cầu "phải sử
+# dụng ứng dụng/dịch vụ OpenAI trong lúc xử lý", không dùng regex/rule cứng để
+# giả lập việc "hiểu" prompt).
+# ------------------------------------------------------------------
+
+class CrisisCardPromptExtraction(BaseModel):
+    """Schema trích xuất Crisis Card từ prompt tự do — KHÔNG gồm contract_id vì
+    contract_id giờ được hệ thống tự gán từ hợp đồng đang chạy ở tab Operations
+    (không còn ô nhập thủ công, và cũng tránh AI đoán sai mã hợp đồng)."""
+    crisis_group: list[Literal[
+        "DEADLINE_EARLY", "DEADLINE_LATE",
+        "COST_CHANGE",
+        "PAYMENT_DELAY",
+        "FINANCE_CONDITION",
+        "SCOPE_CHANGE", "ORDER_CHANGE",
+    ]] = Field(max_length=2)
+    days_deviation: Optional[int] = None
+    extra_cost_amount: Optional[float] = None
+    late_amount: Optional[float] = None
+    late_month: Optional[str] = None
+    late_days: Optional[int] = None
+    new_annual_rate_or_fee: Optional[float] = None
+    new_processing_fee_rate: Optional[float] = None
+    new_collateral_ratio: Optional[float] = None
+    new_num_provinces: Optional[int] = None
+    new_order_count: Optional[int] = None
+    extraction_notes: str
+
+
+def run_crisis_prompt_extraction_agent(client: "OpenAI", model: str, raw_prompt_text: str):
+    """
+    Dùng OpenAI để đọc mô tả biến động bằng ngôn ngữ tự nhiên (tiếng Việt) và trích
+    xuất đúng các trường của CrisisCardInput — thay cho việc phải điền biểu mẫu.
+    Kết quả trả về vẫn phải đi qua validate_crisis_card_input() và toàn bộ luồng
+    tính toán tất định giống hệt đường Form (không có ngoại lệ nào bỏ qua bước
+    kiểm tra hợp lệ chỉ vì dữ liệu đến từ AI).
+    """
+    instructions = """
+Bạn là trợ lý trích xuất dữ liệu cho Crisis Card của OPC. Người dùng mô tả một biến
+động phát sinh trên hợp đồng đang chạy bằng ngôn ngữ tự nhiên (tiếng Việt). Nhiệm vụ:
+đọc kỹ mô tả và trả về CrisisCardPromptExtraction gồm đúng các trường sau, CHỈ điền
+những trường thực sự được đề cập, để trống (null) các trường không có thông tin:
+
+- crisis_group: chọn tối đa 2 trong 7 nhóm sau, đúng với mô tả:
+  DEADLINE_EARLY (khách yêu cầu giao sớm), DEADLINE_LATE (OPC giao muộn),
+  COST_CHANGE (phát sinh chi phí), PAYMENT_DELAY (khách trả muộn),
+  FINANCE_CONDITION (đổi lãi suất/phí xử lý/tỷ lệ thế chấp),
+  SCOPE_CHANGE (đổi số tỉnh/thành triển khai), ORDER_CHANGE (đổi số lượng đơn hàng).
+- days_deviation: số ngày sớm/muộn (dùng cho DEADLINE_EARLY/DEADLINE_LATE).
+- extra_cost_amount: số tiền chi phí phát sinh (VNĐ, dùng cho COST_CHANGE).
+- late_amount, late_month ("YYYY-MM"), late_days: dùng cho PAYMENT_DELAY.
+- new_annual_rate_or_fee, new_processing_fee_rate, new_collateral_ratio: dùng cho
+  FINANCE_CONDITION (chỉ điền trường được đề cập rõ ràng, kể cả khi giá trị mới = 0).
+- new_num_provinces: dùng cho SCOPE_CHANGE.
+- new_order_count: dùng cho ORDER_CHANGE.
+- extraction_notes: tóm tắt ngắn gọn (tiếng Việt) những gì bạn đã hiểu/suy luận từ
+  prompt, và nêu rõ nếu có thông tin còn mơ hồ/thiếu để Founder tự kiểm tra lại.
+
+Quy tắc bắt buộc:
+- Không tự bịa số liệu không có trong prompt.
+- Nếu prompt mô tả nhiều hơn 2 nhóm biến động, chỉ chọn 2 nhóm rõ ràng/quan trọng
+  nhất và nêu rõ trong extraction_notes rằng các nhóm còn lại đã bị bỏ qua.
+- Nếu prompt không đủ thông tin để xác định crisis_group, vẫn phải chọn nhóm gần
+  đúng nhất có thể và ghi rõ sự không chắc chắn trong extraction_notes.
+"""
+    payload = {"raw_prompt_text": raw_prompt_text}
+    return call_structured_agent(
+        client, model, instructions, payload, CrisisCardPromptExtraction, "Crisis Prompt Extraction Agent"
+    )
+
+
+def enforce_crisis_decision_card(
+    decision_result: CrisisDecisionCardOutput,
+    finance_metrics_after: dict,
+    cash_projection_after: dict,
+    requested_amount_after: float,
+    partner_matrix_after: list[dict],
+    triggered_rule_ids: list[str],
+    hard_cap_exceeded: bool = False,
+) -> CrisisDecisionCardOutput:
+    # FIX (gây nhầm lẫn / code thừa): tham số is_new_customer trước đây được truyền
+    # vào nhưng KHÔNG hề dùng trong thân hàm (khác với enforce_decision_card() gốc ở
+    # Mục 6, nơi is_new_customer được dùng để build_protection_condition()). Vì
+    # key_protection_condition ở Crisis Card CHỦ Ý không bị Python ghi đè (giữ đúng
+    # nguyên văn Agent OpenAI sinh ra — xem ghi chú bên dưới), tham số này không có
+    # tác dụng gì và đã được loại bỏ để tránh gây hiểu nhầm là có logic khác biệt
+    # theo loại khách hàng đang được áp dụng ở đây.
+    eligible_options = [item for item in partner_matrix_after if item.get("eligible")]
+    has_financing = bool(eligible_options)
+
+    min_cash = cash_projection_after["min_projected_closing_cash"]
+
+    # YÊU CẦU: key_protection_condition KHÔNG bị Python ghi đè — giữ nguyên đúng giá
+    # trị Agent OpenAI (CrisisDecisionAgent) đã sinh ra. Các trường ĐỊNH LƯỢNG
+    # (gross_margin_after/closing_cash_after/funding_amount_after) luôn bị ép về
+    # đúng số Python đã tính tất định.
+
+    # Mirror đúng quy tắc của enforce_decision_card() (Mục 6): chỉ hiển thị funding_amount
+    # khi thực sự CÓ gói vay eligible; nếu không, phải là 0 dù requested_amount_after > 0
+    # (đó là "nhu cầu" chưa có nguồn, không phải "số sẽ vay được").
+    enforced_funding_amount = round(requested_amount_after, 2) if has_financing else 0.0
+
+    # FIX (lưới an toàn tất định — bug logic thực sự): instructions gửi cho
+    # CrisisDecisionAgent có ghi "BẮT BUỘC chọn TERMINATE" khi closing_cash_after<0
+    # VÀ không còn gói vay eligible nào, nhưng trước đây continue_contract hoàn
+    # toàn không bị Python kiểm tra lại — nghĩa là quy tắc "bắt buộc" này chỉ tồn
+    # tại trên giấy (prompt), phụ thuộc 100% vào việc Agent OpenAI có tuân thủ hay
+    # không. LLM không đảm bảo tuân thủ tuyệt đối mọi lần, nên với 1 quyết định
+    # nghiệp vụ quan trọng như TERMINATE, cần enforce cứng bằng Python.
+    #
+    # Áp dụng cho đúng 2 điều kiện tất định đã được xác định rõ trong hệ thống:
+    #   (1) closing_cash sau biến động < 0 VÀ partner_matrix không còn eligible nào
+    #       (không còn nguồn bù đắp funding gap).
+    #   (2) hard_cap_exceeded=True (ORDER_CHANGE vượt trần cứng OPC có thể nhận).
+    # Nếu Agent đã tự trả TERMINATE thì giữ nguyên (không đổi lý do/summary của
+    # Agent một cách không cần thiết).
+    mandatory_terminate_reasons = []
+    if min_cash < 0 and not has_financing:
+        mandatory_terminate_reasons.append(
+            "closing cash sau biến động < 0 và không còn gói vay eligible nào trong "
+            "partner_matrix (không còn nguồn bù đắp funding gap)"
+        )
+    if hard_cap_exceeded:
+        mandatory_terminate_reasons.append(
+            "số order mới vượt trần cứng OPC có thể nhận (hard_cap_exceeded=True)"
+        )
+
+    enforced_continue_contract = decision_result.continue_contract
+    enforced_executive_summary = decision_result.executive_summary
+    if mandatory_terminate_reasons and decision_result.continue_contract != "TERMINATE":
+        enforced_continue_contract = "TERMINATE"
+        reasons_text = "; ".join(mandatory_terminate_reasons)
+        enforced_executive_summary = (
+            f"[Ghi đè tất định bởi hệ thống — TERMINATE bắt buộc vì: {reasons_text}]. "
+            f"Đánh giá ban đầu của Agent (không được dùng làm quyết định cuối): "
+            f"{decision_result.executive_summary}"
+        )
+
+    return decision_result.model_copy(
+        update={
+            "continue_contract": enforced_continue_contract,
+            "gross_margin_after": finance_metrics_after["gross_margin"],
+            "closing_cash_after": min_cash,
+            "funding_amount_after": enforced_funding_amount,
+            "executive_summary": enforced_executive_summary,
+        }
+    )
+
 # ============================================================
 # 8. UI
 # ============================================================
@@ -1718,7 +2363,7 @@ div[data-testid="stTabs"] [data-baseweb="tab-border"] {
 </style>
 """, unsafe_allow_html=True)
 
-tab_ops, tab_dashboard = st.tabs(["⚙️ Operations (Input & Workflow)", "🏆 Decision Dashboard"])
+tab_ops, tab_crisis, tab_dashboard = st.tabs(["⚙️ Operations (Input & Workflow)", "🆘 Crisis Card", "🏆 Decision Dashboard"])
 
 with tab_ops:
     col_input, col_workflow = st.columns([1.0, 2.2], gap="large")
@@ -1736,6 +2381,7 @@ with tab_ops:
             try:
                 file_bytes = uploaded_file.getvalue()
                 data = load_team_pack(file_bytes)
+                st.session_state["opc_data"] = data
                 st.success(f"Đã nạp {len(data)} sheet bắt buộc từ CSV.")
                 with st.expander("Danh sách sheet đã đọc"):
                     st.write(list(data.keys()))
@@ -2054,8 +2700,18 @@ with tab_ops:
                         # mà Founder chưa hề xem qua. Luôn reset về "Chưa quyết định" mỗi khi
                         # có Decision Card mới.
                         st.session_state.founder_decision = "Chưa quyết định"
+                        # FIX (theo yêu cầu bổ sung): mỗi lần chạy lại Multi-Agent là một hợp
+                        # đồng/baseline MỚI được nạp vào "opc_result" — dữ liệu Crisis Card
+                        # (crisis_card, crisis_result) đang lưu trong session thuộc về hợp đồng
+                        # CŨ nên phải bị xóa ngay tại đây để không hiển thị nhầm Crisis Card của
+                        # hợp đồng cũ lên hợp đồng mới. Ngược lại, việc chỉ CHUYỂN TAB (không
+                        # chạy lại Multi-Agent) sẽ KHÔNG chạm vào nhánh này nên dữ liệu Crisis
+                        # Card đã nhập/đã tính vẫn được giữ nguyên.
+                        st.session_state.pop("crisis_card", None)
+                        st.session_state.pop("crisis_result", None)
                         st.session_state["opc_result"] = {
                             "model": model,
+                            "profile": profile,
                             "customer": {
                                 "customer_name": customer_name,
                                 "customer_type": customer_type,
@@ -2376,6 +3032,407 @@ with tab_ops:
                     )
                 else:
                     st.success("✅ Không có rule nào cần rà soát thêm trong lượt chạy này.")
+
+
+CRISIS_GROUP_LABELS = {
+    "DEADLINE_EARLY": "Giao sớm (Deadline Early)",
+    "DEADLINE_LATE": "Giao muộn (Deadline Late)",
+    "COST_CHANGE": "Phát sinh chi phí (Cost Change)",
+    "PAYMENT_DELAY": "Chậm thanh toán (Payment Delay)",
+    "FINANCE_CONDITION": "Thay đổi đ/k tài chính (Finance Condition)",
+    "SCOPE_CHANGE": "Đổi địa bàn (Scope Change)",
+    "ORDER_CHANGE": "Đổi số lượng đơn hàng (Order Change)"
+}
+
+with tab_crisis:
+    st.subheader("Crisis Card (MVP 1-6)")
+    st.caption("Nhập biến động để đánh giá Before/After và gọi AI chốt phương án.")
+
+    if not result:
+        st.warning("Vui lòng chạy baseline ở tab Operations trước khi nhập Crisis Card.")
+    else:
+        baseline_metrics = result.get("finance_metrics", {})
+        default_late_amount = 0.0
+        if baseline_metrics.get("contract_months") and baseline_metrics["contract_months"] > 0:
+            default_late_amount = float(baseline_metrics["total_list_price"] / baseline_metrics["contract_months"])
+
+        # FIX (theo yêu cầu bổ sung): bỏ ô nhập contract_id thủ công — Crisis Card
+        # giờ LUÔN áp dụng cho đúng hợp đồng đang chạy ở tab Operations (kết quả
+        # baseline hiện có trong session), lấy customer_id nếu là khách hàng cũ,
+        # nếu không thì fallback về tên khách hàng đã nhập.
+        _existing_customer_info = (result.get("customer") or {}).get("existing_customer") or {}
+        running_contract_id = str(
+            _existing_customer_info.get("customer_id")
+            or (result.get("customer") or {}).get("customer_name")
+            or "N/A"
+        )
+        st.info(f"🔗 Crisis Card sẽ áp dụng cho hợp đồng đang chạy: **{running_contract_id}**")
+
+        # FIX (nghiêm trọng): yêu cầu ghi rõ "Nhập dữ kiện Crisis Card bằng prompt
+        # HOẶC biểu mẫu đơn giản" -- trước đây chỉ có đường Form. Nay thêm lựa chọn
+        # chế độ nhập; cả 2 đường đều hội tụ về cùng 1 CrisisCardInput, cùng đi qua
+        # validate_crisis_card_input() và cùng 1 khối xử lý tất định bên dưới (không
+        # có đường tắt nào bỏ qua kiểm tra hợp lệ).
+        input_mode = st.radio(
+            "Chế độ nhập Crisis Card",
+            ["📋 Biểu mẫu (form)", "💬 Prompt (mô tả tự do bằng AI)"],
+            horizontal=True,
+        )
+
+        crisis_submit = False
+        crisis_card = None
+        validation_errors = []
+
+        if input_mode == "📋 Biểu mẫu (form)":
+            with st.form("crisis_card_form"):
+                crisis_group = st.multiselect("Nhóm biến động (crisis_group)", list(CRISIS_GROUP_LABELS.keys()), format_func=lambda key: CRISIS_GROUP_LABELS[key], max_selections=2, key="cc_crisis_group")
+
+                days_deviation_input = st.number_input("Số ngày sớm/muộn", min_value=0, value=0, step=1, key="cc_days_deviation")
+                extra_cost_amount_input = st.number_input("Chi phí phát sinh (VNĐ)", min_value=0.0, value=0.0, step=1_000_000.0, key="cc_extra_cost_amount")
+                late_amount_input = st.number_input("Số tiền khách hàng trả muộn (VNĐ)", min_value=0.0, value=default_late_amount, step=1_000_000.0, key="cc_late_amount")
+                late_month_input = st.text_input(
+                    "Tháng bị trả muộn (VD: 2026-07) — để trống = tự động áp dụng vào tháng ĐẦU của hợp đồng",
+                    key="cc_late_month",
+                )
+                late_days_input = st.number_input("Số ngày trả muộn (áp lãi kép 1%/ngày)", min_value=0, value=0, step=1, key="cc_late_days")
+
+                # FIX (bug logic thực sự): trước đây dùng "giá trị = 0.0" làm cờ
+                # "không đổi trường này", nên KHÔNG THỂ nhập giá trị 0 hợp lệ về mặt
+                # nghiệp vụ (VD: miễn phí xử lý, không cần thế chấp). Nay dùng
+                # checkbox tường minh để phân biệt "không đổi" và "đổi thành 0".
+                st.caption("Tick chọn nếu muốn đổi trường tương ứng (kể cả khi giá trị mới = 0, VD: miễn phí xử lý / không cần thế chấp).")
+                chg_rate = st.checkbox("Đổi annual_rate_or_fee", key="cc_chg_rate")
+                new_annual_rate_or_fee_input = st.number_input("annual_rate_or_fee mới", min_value=0.0, value=0.0, step=0.001, format="%.4f", disabled=not chg_rate, key="cc_new_annual_rate")
+                chg_fee = st.checkbox("Đổi processing_fee_rate", key="cc_chg_fee")
+                new_processing_fee_rate_input = st.number_input("processing_fee_rate mới", min_value=0.0, value=0.0, step=0.001, format="%.4f", disabled=not chg_fee, key="cc_new_processing_fee")
+                chg_collateral = st.checkbox("Đổi collateral_ratio", key="cc_chg_collateral")
+                new_collateral_ratio_input = st.number_input("collateral_ratio mới", min_value=0.0, value=0.0, step=0.01, format="%.2f", disabled=not chg_collateral, key="cc_new_collateral")
+
+                new_num_provinces_input = st.number_input("Số tỉnh/thành phố mới", min_value=0, value=0, step=1, key="cc_new_num_provinces")
+                new_order_count_input = st.number_input("Số lượng đơn hàng mới", min_value=0, value=0, step=1, key="cc_new_order_count")
+
+                crisis_submit = st.form_submit_button("Xác nhận Crisis Card", type="primary", use_container_width=True)
+
+            if crisis_submit:
+                finance_condition_fields = {
+                    "new_annual_rate_or_fee": new_annual_rate_or_fee_input if chg_rate else None,
+                    "new_processing_fee_rate": new_processing_fee_rate_input if chg_fee else None,
+                    "new_collateral_ratio": new_collateral_ratio_input if chg_collateral else None,
+                }
+
+                try:
+                    crisis_card = CrisisCardInput(
+                        crisis_group=crisis_group,
+                        contract_id=running_contract_id,
+                        days_deviation=int(days_deviation_input) if days_deviation_input else None,
+                        extra_cost_amount=float(extra_cost_amount_input) if extra_cost_amount_input else None,
+                        late_amount=float(late_amount_input) if late_amount_input else None,
+                        late_month=late_month_input.strip() if late_month_input else None,
+                        late_days=int(late_days_input) if late_days_input else None,
+                        new_annual_rate_or_fee=finance_condition_fields["new_annual_rate_or_fee"],
+                        new_processing_fee_rate=finance_condition_fields["new_processing_fee_rate"],
+                        new_collateral_ratio=finance_condition_fields["new_collateral_ratio"],
+                        new_num_provinces=int(new_num_provinces_input) if new_num_provinces_input else None,
+                        new_order_count=int(new_order_count_input) if new_order_count_input else None,
+                    )
+                    validation_errors = validate_crisis_card_input(crisis_card)
+                except Exception as exc:
+                    crisis_card = None
+                    validation_errors = [f"Không dựng được CrisisCardInput: {exc}"]
+
+        else:  # 💬 Prompt (mô tả tự do bằng AI)
+            with st.form("crisis_card_prompt_form"):
+                crisis_prompt_text = st.text_area(
+                    "Mô tả biến động (Crisis) bằng ngôn ngữ tự nhiên",
+                    height=150,
+                    placeholder="VD: Khách hàng yêu cầu giao sớm 10 ngày so với kế hoạch ban đầu...",
+                    key="cc_prompt_text",
+                )
+                crisis_prompt_submit = st.form_submit_button("🤖 Trích xuất Crisis Card bằng AI", type="primary", use_container_width=True)
+
+            if crisis_prompt_submit:
+                crisis_submit = True
+                if not crisis_prompt_text.strip():
+                    validation_errors = ["Cần nhập mô tả biến động trước khi trích xuất."]
+                else:
+                    with st.spinner("Đang trích xuất Crisis Card từ prompt bằng OpenAI..."):
+                        try:
+                            client_extract = OpenAI(api_key=api_key)
+                            extraction, _ = run_crisis_prompt_extraction_agent(client_extract, model, crisis_prompt_text.strip())
+                            crisis_card = CrisisCardInput(
+                                crisis_group=extraction.crisis_group,
+                                contract_id=running_contract_id,
+                                days_deviation=extraction.days_deviation,
+                                extra_cost_amount=extraction.extra_cost_amount,
+                                late_amount=extraction.late_amount,
+                                late_month=extraction.late_month,
+                                late_days=extraction.late_days,
+                                new_annual_rate_or_fee=extraction.new_annual_rate_or_fee,
+                                new_processing_fee_rate=extraction.new_processing_fee_rate,
+                                new_collateral_ratio=extraction.new_collateral_ratio,
+                                new_num_provinces=extraction.new_num_provinces,
+                                new_order_count=extraction.new_order_count,
+                                raw_prompt_text=crisis_prompt_text.strip(),
+                            )
+                            validation_errors = validate_crisis_card_input(crisis_card)
+                            st.info(f"🤖 AI đã hiểu: {extraction.extraction_notes}")
+                        except Exception as exc:
+                            crisis_card = None
+                            validation_errors = [f"Không trích xuất được Crisis Card từ prompt: {exc}"]
+
+        if crisis_submit:
+            if validation_errors:
+                st.error("Crisis Card chưa hợp lệ:\n" + "\n".join(f"- {msg}" for msg in validation_errors))
+            else:
+                st.session_state.crisis_card = crisis_card.model_dump()
+                st.success("Crisis Card hợp lệ. Đang tính toán Before/After...")
+
+                with st.spinner("Processing Crisis Impact..."):
+                    try:
+                        crisis_obj = CrisisCardInput(**st.session_state.crisis_card)
+                        baseline_metrics = result["finance_metrics"]
+                        list_price_goc = baseline_metrics["total_list_price"]
+
+                        delta = resolve_crisis_deltas(crisis_obj, list_price_goc, result["customer"].get("num_provinces"))
+
+                        # FIX (bug nghiêm trọng): trước đây vượt trần cứng ORDER_CHANGE làm
+                        # resolve_crisis_deltas() raise Exception -> crash cả luồng, không có
+                        # Decision Card nào được trả về. Nay xử lý tất định ngay tại đây: dừng
+                        # sớm, không gọi AI (vì đã đủ căn cứ để kết luận), và vẫn trả lời đầy đủ
+                        # continue_contract / financing_plan / key_protection_condition như yêu
+                        # cầu bắt buộc.
+                        if delta.hard_cap_exceeded:
+                            st.error(f"🚫 {delta.note}")
+                            st.session_state.crisis_result = {
+                                "finance_metrics": baseline_metrics,
+                                "cash_projection": result.get("cash_projection", {}),
+                                "risk_level_after": "CRITICAL",
+                                "requested_amount_after": 0.0,
+                                "finance_condition_warning": None,
+                                "final_decision": {
+                                    "continue_contract": "TERMINATE",
+                                    "financing_plan": "Không áp dụng — hợp đồng vượt trần cứng số lượng đơn hàng, chưa thể huy động vốn cho một phạm vi chưa được chấp nhận.",
+                                    "key_protection_condition": "Giảm số lượng đơn hàng về đúng hạn mức cho phép (hoặc đàm phán lại hạn mức với Founder) trước khi tái xử lý Crisis Card này.",
+                                    "gross_margin_after": baseline_metrics.get("gross_margin", 0.0),
+                                    "closing_cash_after": result.get("cash_projection", {}).get("min_projected_closing_cash", 0.0),
+                                    "funding_amount_after": 0.0,
+                                    "executive_summary": delta.note,
+                                },
+                            }
+                        else:
+                            sys_data = st.session_state.get("opc_data")
+                            if not sys_data:
+                                raise ValueError("Chưa nạp Team Pack. Vui lòng quay lại tab Operations để tải Team Pack lên.")
+
+                            if "profile" not in result:
+                                result["profile"] = get_profile(sys_data)
+
+                            products_df = sys_data["05_PRODUCTS"].copy()
+                            selected_products_df = products_df[products_df["service_name"].astype(str).isin(result["opportunity"]["selected_services"])]
+
+                            fm_after = build_finance_metrics_with_crisis(
+                                selected_products_df,
+                                result["profile"].get("payment_reliability", 1.0),
+                                result["customer"].get("province"),
+                                result.get("transaction_risk_score"),
+                                pd.to_datetime(result["opportunity"]["order_date"]),
+                                pd.to_datetime(result["opportunity"]["due_date"]),
+                                result["customer"].get("num_provinces"),
+                                delta
+                            )
+
+                            reserve_minimum = float(result["profile"].get("cash_reserve_minimum", CASH_RESERVE_THRESHOLD_DEFAULT) or CASH_RESERVE_THRESHOLD_DEFAULT)
+
+                            cp_after = project_closing_cash_with_crisis(
+                                sys_data, selected_products_df, fm_after, pd.to_datetime(result["opportunity"]["order_date"]),
+                                reserve_minimum, delta
+                            )
+
+                            req_after = max(0.0, reserve_minimum - cp_after["min_projected_closing_cash"])
+                            # FIX (bug logic thực sự): rerun_partner_matrix_from_layer() giờ trả
+                            # thêm finance_condition_warning để không còn âm thầm bỏ qua thay đổi
+                            # tài chính khi không xác định được gói vay cụ thể để áp dụng.
+                            pm_after, finance_condition_warning = rerun_partner_matrix_from_layer(sys_data, req_after, cp_after, crisis_obj, result.get("partner_matrix"))
+                            # req_after ở trên chỉ là "nhu cầu vốn thô" (funding_need) dùng để lọc
+                            # Partner Matrix — giống hệt cách baseline dùng nó ở Mục 4. Số tiền
+                            # requested_amount CUỐI CÙNG phải qua determine_requested_amount() để áp
+                            # đúng ràng buộc "chỉ nâng sàn lên minimum_amount khi sản phẩm tốt nhất
+                            # thực sự eligible" (đúng bản fix đã ghi chú ở Mục 6, không được bỏ qua
+                            # riêng cho Crisis Card).
+                            requested_amount_after = determine_requested_amount(cp_after, pm_after)
+
+                            client = OpenAI(api_key=api_key)
+                            crisis_context = {
+                                "crisis_group": crisis_obj.crisis_group,
+                                "extra_oper": delta.extra_oper,
+                                "extra_estimated_cost": delta.extra_estimated_cost,
+                                "extra_list_price": delta.extra_list_price,
+                                "payment_shift": delta.payment_shift,
+                                "note": delta.note
+                            }
+
+                            finance_payload_after = {
+                                "customer": result["customer"],
+                                "opportunity": result["opportunity"],
+                                "finance_metrics": fm_after,
+                                "cash_projection": cp_after,
+                                "confidence_result": result.get("confidence_result"),
+                                "missing_fields": result.get("missing_fields", []),
+                                "crisis_context": crisis_context
+                            }
+                            masked_f_payload_after, _ = mask_sensitive_fields(finance_payload_after)
+                            f_res_after, _ = run_finance_agent(client, model, masked_f_payload_after)
+
+                            risk_eval_after = evaluate_risk_rules(
+                                sys_data,
+                                fm_after,
+                                cp_after,
+                                result.get("confidence_result"),
+                            )
+                            triggered_after = list(risk_eval_after.get("triggered_rules", []))
+                            triggered_ids_after = {
+                                r.get("rule_id") for r in triggered_after if r.get("rule_id")
+                            }
+                            if cp_after["cash_reserve_breach"] and "RR-002" not in triggered_ids_after:
+                                triggered_after.append({"rule_id": "RR-002", "description": "Thiếu hụt dòng tiền (Crisis)", "severity": "High"})
+                                triggered_ids_after.add("RR-002")
+
+                            if any(g in ("DEADLINE_EARLY", "DEADLINE_LATE") for g in crisis_obj.crisis_group) and crisis_obj.days_deviation and crisis_obj.days_deviation > 7:
+                                if "SCHEDULE_BREACH" not in triggered_ids_after:
+                                    triggered_after.append({"rule_id": "SCHEDULE_BREACH", "description": "Vi phạm tiến độ nghiêm trọng (>7 ngày)", "severity": "High"})
+                                    triggered_ids_after.add("SCHEDULE_BREACH")
+
+                            if "PAYMENT_DELAY" in crisis_obj.crisis_group and crisis_obj.late_amount and crisis_obj.late_amount > 0:
+                                if "PAYMENT_PATTERN_RISK" not in triggered_ids_after:
+                                    triggered_after.append({"rule_id": "PAYMENT_PATTERN_RISK", "description": "Khách hàng chậm thanh toán", "severity": "High"})
+                                    triggered_ids_after.add("PAYMENT_PATTERN_RISK")
+
+                            base_risk_level_after = derive_risk_level_from_triggered_rules(triggered_after)
+                            before_cash_for_risk = float(
+                                result.get("cash_projection", {}).get("min_projected_closing_cash", 0.0) or 0.0
+                            )
+                            before_requested_amount_for_risk = float(result.get("requested_amount", 0.0) or 0.0)
+                            risk_level_after = adjust_crisis_risk_level_by_financial_delta(
+                                base_risk_level_after,
+                                before_cash_for_risk,
+                                float(cp_after.get("min_projected_closing_cash", 0.0) or 0.0),
+                                before_requested_amount_for_risk,
+                                float(requested_amount_after or 0.0),
+                                triggered_after,
+                            )
+
+                            risk_payload_after = {
+                                "finance_agent_output": f_res_after.model_dump() if f_res_after else {},
+                                "finance_metrics": fm_after,
+                                "cash_projection": cp_after,
+                                "confidence_result": result.get("confidence_result"),
+                                "triggered_rules": triggered_after,
+                                "risk_level": risk_level_after,
+                                "missing_fields": result.get("missing_fields", []),
+                                "crisis_context": crisis_context
+                            }
+                            masked_r_payload_after, _ = mask_sensitive_fields(risk_payload_after)
+                            r_res_after, _ = run_risk_agent(client, model, masked_r_payload_after)
+
+                            decision_payload_after = {
+                                "customer": result["customer"],
+                                "finance_metrics": fm_after,
+                                "cash_projection": cp_after,
+                                "confidence_result": result.get("confidence_result"),
+                                "finance_agent_output": f_res_after.model_dump() if f_res_after else {},
+                                "risk_agent_output": r_res_after.model_dump() if r_res_after else {},
+                                "triggered_rules": triggered_after,
+                                "risk_level": risk_level_after,
+                                "baseline_context": {
+                                    "closing_cash_before": before_cash_for_risk,
+                                    "requested_amount_before": before_requested_amount_for_risk,
+                                },
+                                "partner_matrix": pm_after,
+                                "requested_amount": requested_amount_after,
+                                "large_decision_threshold": LARGE_DECISION_THRESHOLD,
+                                "founder_approval_needed": requested_amount_after > LARGE_DECISION_THRESHOLD,
+                                "missing_fields": result.get("missing_fields", []),
+                                "crisis_context": crisis_context
+                            }
+                            masked_d_payload_after, _ = mask_sensitive_fields(decision_payload_after)
+
+                            d_res_after_raw = run_crisis_decision_agent(
+                                client, model, masked_d_payload_after
+                            )
+                            d_res_after = d_res_after_raw[0] if d_res_after_raw else None
+
+                            if d_res_after:
+                                # FIX (gây nhầm lẫn / code thừa): enforce_crisis_decision_card()
+                                # không còn nhận is_new_customer (tham số này trước đây không hề
+                                # được dùng trong thân hàm — xem ghi chú tại định nghĩa hàm).
+                                final_decision = enforce_crisis_decision_card(
+                                    d_res_after, fm_after, cp_after, requested_amount_after, pm_after, [r["rule_id"] for r in triggered_after]
+                                )
+                                st.session_state.crisis_result = {
+                                    "finance_metrics": fm_after,
+                                    "cash_projection": cp_after,
+                                    "risk_level_after": risk_level_after,
+                                    "requested_amount_after": requested_amount_after,
+                                    "finance_condition_warning": finance_condition_warning,
+                                    "final_decision": final_decision.model_dump()
+                                }
+                    except Exception as e:
+                        st.error(f"Lỗi hệ thống khi xử lý Crisis: {str(e)}")
+
+        if "crisis_result" in st.session_state:
+            st.markdown("### Kết quả Crisis (Before vs After)")
+            c_res = st.session_state.crisis_result
+            c_dec = c_res["final_decision"]
+            baseline_dec = result["decision_result"]
+
+            b_risk = result.get("risk_level", "UNKNOWN")
+            a_risk = c_res.get("risk_level_after", b_risk)
+
+            b_cash = result.get("cash_projection", {}).get("min_projected_closing_cash", 0.0)
+            a_cash = c_res.get("cash_projection", {}).get("min_projected_closing_cash", b_cash)
+
+            b_gm = result.get("finance_metrics", {}).get("gross_margin", 0.0)
+            a_gm = c_res.get("finance_metrics", {}).get("gross_margin", b_gm)
+
+            # Dùng đúng funding_amount đã được enforce_decision_card()/
+            # enforce_crisis_decision_card() ép về 0 khi partner_matrix không có
+            # eligible=true — KHÔNG dùng requested_amount (đó là "nhu cầu vốn" thô,
+            # vẫn dương ngay cả khi không có gói vay nào khả thi, nên nếu hiển thị ở
+            # đây sẽ mâu thuẫn với chính nội dung Financing Plan).
+            b_funding = result.get("decision_result", {}).get("funding_amount", 0.0)
+            a_funding = c_dec.get("funding_amount_after", b_funding)
+
+            def format_vnd_safe(val):
+                return f"{val:,.0f} VND" if val else "0 VND"
+
+            col1, col2, col3, col4, col5 = st.columns(5)
+            col1.metric("Closing Cash", format_vnd_safe(a_cash), format_vnd_safe(a_cash - b_cash))
+            col2.metric("Risk Level", a_risk, "Old: " + b_risk)
+            # FIX (gây nhầm lẫn): continue_contract (CONTINUE/CONTINUE_WITH_CONDITIONS/
+            # TERMINATE) và recommendation gốc (ACCEPT/CONDITIONAL_ACCEPT/REJECT/
+            # NEED_MORE_DATA) là 2 thang nhãn KHÁC HỆ THỐNG — trước đây đặt cạnh nhau
+            # dưới dạng "delta" của cùng 1 metric khiến người xem dễ hiểu nhầm là cùng
+            # một thang đo. Nay tách rõ 2 dòng thông tin, không dùng delta cho cặp này.
+            col3.metric("Decision (Sau biến động)", c_dec["continue_contract"])
+            col4.metric("Gross Margin", f"{a_gm:.1%}", f"{(a_gm - b_gm):.1%}")
+            col5.metric("Funding Amount", format_vnd_safe(a_funding), format_vnd_safe(a_funding - b_funding))
+            st.caption(
+                f"ℹ️ Quyết định gốc trước biến động (thang đánh giá khác — "
+                f"ACCEPT/CONDITIONAL_ACCEPT/REJECT/NEED_MORE_DATA): **{baseline_dec['recommendation']}**. "
+                "Không so sánh trực tiếp 1-1 với continue_contract ở trên vì đây là 2 thang đo khác nhau."
+            )
+
+            st.info(f"**Executive Summary (Crisis):** {c_dec['executive_summary']}")
+            st.warning(f"**Protection Condition:** {c_dec['key_protection_condition']}")
+            st.success(f"**Financing Plan:** {c_dec['financing_plan']}")
+
+            payment_shift_warning = c_res.get("cash_projection", {}).get("payment_shift_warning")
+            if payment_shift_warning:
+                st.error(f"⚠️ {payment_shift_warning}")
+
+            finance_condition_warning = c_res.get("finance_condition_warning")
+            if finance_condition_warning:
+                st.warning(f"⚠️ {finance_condition_warning}")
 
 
 with tab_dashboard:
@@ -2704,3 +3761,6 @@ st.markdown('''
     </div>
 </div>
 ''', unsafe_allow_html=True)
+
+
+
