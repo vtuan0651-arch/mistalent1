@@ -2279,13 +2279,64 @@ div[data-testid="stMetric"] {
     box-shadow: var(--shadow);
 }
 
-/* Form container */
-[data-testid="stForm"] {
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: var(--surface);
-    padding: 18px;
-    box-shadow: var(--shadow);
+/* Alert boxes (st.success / st.info / st.warning / st.error) — thay nền màu
+   phẳng loè loẹt mặc định bằng thẻ trung tính, viền trái theo màu ngữ nghĩa,
+   bo góc + đổ bóng đồng bộ với phần còn lại của giao diện. */
+[data-testid="stAlert"], [data-testid="stAlertContainer"] {
+    background: var(--surface-muted) !important;
+    border: 1px solid var(--line) !important;
+    border-left: 4px solid var(--brand) !important;
+    border-radius: var(--radius-sm) !important;
+    box-shadow: var(--shadow) !important;
+    padding: 14px 16px !important;
+}
+
+[data-testid="stAlert"] p, [data-testid="stAlert"] div, [data-testid="stAlert"] span,
+[data-testid="stAlertContainer"] p, [data-testid="stAlertContainer"] div, [data-testid="stAlertContainer"] span {
+    color: var(--ink) !important;
+}
+
+[data-testid="stAlertContentSuccess"] { border-left: 4px solid var(--success) !important; }
+[data-testid="stAlertContentInfo"] { border-left: 4px solid var(--brand) !important; }
+[data-testid="stAlertContentWarning"] { border-left: 4px solid var(--warning) !important; }
+[data-testid="stAlertContentError"] { border-left: 4px solid var(--danger) !important; }
+
+/* File uploader — bo góc + viền đứt nét mảnh, đồng bộ token thay vì viền mặc định */
+[data-testid="stFileUploaderDropzone"] {
+    background: var(--surface-muted) !important;
+    border: 1.5px dashed var(--line-strong) !important;
+    border-radius: var(--radius-sm) !important;
+}
+
+[data-testid="stFileUploaderDropzone"] button {
+    border-radius: var(--radius-sm) !important;
+}
+
+/* Radio / checkbox / slider — đổi màu accent mặc định (đỏ theo theme
+   Streamlit) sang màu thương hiệu để đồng bộ toàn bộ giao diện. */
+.stRadio [role="radiogroup"] label div:first-child,
+.stCheckbox label div:first-child {
+    border-color: var(--line-strong) !important;
+}
+
+.stRadio [aria-checked="true"] div:first-child,
+.stCheckbox [aria-checked="true"] div:first-child {
+    background-color: var(--brand) !important;
+    border-color: var(--brand) !important;
+}
+
+.stSlider [role="slider"] {
+    background-color: var(--brand) !important;
+    border-color: var(--brand) !important;
+}
+
+.stSlider div[data-baseweb="slider"] > div > div {
+    background: var(--brand) !important;
+}
+
+/* Progress bar mặc định của Streamlit (spinner/progress) theo màu thương hiệu */
+.stProgress > div > div > div {
+    background-color: var(--brand) !important;
 }
 </style>
 """,
@@ -2338,7 +2389,7 @@ div[data-testid="stTabs"] {
     border: none;
     border-radius: 13px;
     padding: 5px;
-    margin-bottom: 20px;
+    margin-bottom: 0;
     box-shadow: none;
 }
 
@@ -2359,22 +2410,44 @@ div[data-testid="stTabs"] button[data-baseweb="tab"] p {
 div[data-testid="stTabs"] button[aria-selected="true"] {
     color: var(--brand-dark) !important;
     background: #ffffff;
-    border-bottom: none !important;
     box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
 }
 
-div[data-testid="stTabs"] [data-baseweb="tab-highlight"] {
+/* Triệt để loại bỏ mọi vệt chỉ báo màu đỏ mặc định của Streamlit (theme
+   primaryColor) bên dưới tab đang chọn — bao gồm cả pseudo-element ::after
+   mà một số phiên bản Streamlit tự vẽ, không chỉ riêng tab-highlight. */
+div[data-testid="stTabs"] button[data-baseweb="tab"],
+div[data-testid="stTabs"] button[data-baseweb="tab"]::before,
+div[data-testid="stTabs"] button[data-baseweb="tab"]::after,
+div[data-testid="stTabs"] [data-baseweb="tab-highlight"],
+div[data-testid="stTabs"] [data-baseweb="tab-border"] {
+    background-image: none !important;
     background-color: transparent !important;
+    border: none !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+    outline: none !important;
     height: 0 !important;
 }
 
-div[data-testid="stTabs"] [data-baseweb="tab-border"] {
-    background-color: transparent !important;
+div[data-testid="stTabs"] button[aria-selected="true"] {
+    background-color: #ffffff !important;
+}
+
+/* Khung nội dung mỗi tab — biến thành một "card" trắng bo góc, đổ bóng nhẹ,
+   thay vì để nội dung trôi nổi trực tiếp trên nền xám của trang. */
+.stTabs [data-baseweb="tab-panel"] {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-top: none;
+    border-radius: 0 0 var(--radius) var(--radius);
+    padding: 28px 26px 8px;
+    box-shadow: var(--shadow);
 }
 </style>
 """, unsafe_allow_html=True)
 
-tab_ops, tab_crisis, tab_dashboard = st.tabs(["⚙️ Operations (Input & Workflow)", "🆘 Crisis Card", "🏆 Decision Dashboard"])
+tab_ops, tab_crisis, tab_dashboard = st.tabs(["⚙️ Operations (Input & Workflow)", "⚠️ Crisis Card", "🏆 Decision Dashboard"])
 
 with tab_ops:
     col_input, col_workflow = st.columns([1.0, 2.2], gap="large")
@@ -3771,3 +3844,6 @@ st.markdown('''
     </div>
 </div>
 ''', unsafe_allow_html=True)
+
+
+
