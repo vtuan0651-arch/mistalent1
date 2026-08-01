@@ -2547,7 +2547,7 @@ div[data-testid="stTabs"] {
     border: 1px solid #e2e8f0;
     border-radius: 18px;
     padding: 10px 14px 0 14px;
-    margin-bottom: 22px;
+    margin-bottom: 24px;
     box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
 }
 
@@ -2594,7 +2594,7 @@ div[data-testid="stTabs"] [data-baseweb="tab-border"] {
     border: 1px solid #e2e8f0;
     border-radius: 20px;
     padding: 26px 30px;
-    margin-bottom: 22px;
+    margin-bottom: 23px;
     box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
 }
 .ops-hero-title {
