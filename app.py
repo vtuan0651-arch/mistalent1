@@ -3811,7 +3811,7 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                             # thực sự eligible" (đúng bản fix đã ghi chú ở Mục 6, không được bỏ qua
                             # riêng cho Crisis Card).
                             requested_amount_after = determine_requested_amount(cp_after, pm_after)
-
+                        
                             client = OpenAI(api_key=api_key)
                             crisis_context = {
                                 "crisis_group": crisis_obj.crisis_group,
