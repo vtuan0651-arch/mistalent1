@@ -1813,7 +1813,7 @@ Nhiệm vụ — trả về CrisisDecisionCardOutput gồm:
 5. executive_summary: tóm tắt ngắn gọn bằng tiếng Việt về tác động của biến động
    này lên hợp đồng và lý do đưa ra continue_contract ở trên.
 6. Risk level phải đánh giá đúng tình hình tài chính BEFORE/AFTER:
-    - Đánh giá dựa trên bảng risk rule: Nếu không vi phạm risk rule mới thì không thay đổi mức độ risk rule 
+    - Đánh giá dựa vào risk rule vi phạm ở trên. Nếu không vi phạm thêm risk rule nào thì không được thay đổi.  
     - Không tự đặt risk_level trái với triggered_rules/risk_level đã có trong payload.
 Quy tắc bắt buộc:
 - Không phát minh số liệu, sản phẩm tín dụng hay điều khoản ngoài payload.
@@ -2301,6 +2301,11 @@ div[data-testid="stMetricValue"] {
     background: linear-gradient(135deg, #1e3a8a, #4f46e5);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+    white-space: normal !important;
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
 }
 
 div[data-testid="stMetricLabel"] {
@@ -2309,6 +2314,11 @@ div[data-testid="stMetricLabel"] {
     text-transform: uppercase;
     letter-spacing: 0.5px;
     font-size: 0.8rem !important;
+    white-space: normal !important;
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
 }
 
 /* Dataframes */
@@ -2664,11 +2674,21 @@ div[data-testid="stTabs"] div[data-testid="stMetricLabel"] {
     font-size: 0.76rem !important;
     color: #64748b !important;
     font-weight: 700 !important;
+    white-space: normal !important;
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
 }
 div[data-testid="stTabs"] div[data-testid="stMetricValue"] {
     font-size: 1.65rem !important;
     font-weight: 800 !important;
     color: #0f172a !important;
+    white-space: normal !important;
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
 }
 
 /* Expander -> card trắng bo tròn, giống card biểu đồ trong ảnh */
