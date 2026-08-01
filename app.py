@@ -2036,10 +2036,6 @@ def enforce_crisis_decision_card(
     # Nếu Agent đã tự trả TERMINATE thì giữ nguyên (không đổi lý do/summary của
     # Agent một cách không cần thiết).
     mandatory_terminate_reasons = []
-    if cp_after["cash_reserve_breach"] and (confidence_result_after is None or confidence_result_after["confidence_score"] < 0.65):
-    mandatory_terminate_reasons.append(
-        "post-crisis cash breach kèm confidence_score < 0.65 (RR-006) — độ tin cậy dữ liệu quá thấp để tiếp tục"
-    )
     if min_cash < 0 and not has_financing:
         mandatory_terminate_reasons.append(
             "closing cash sau biến động < 0 và không còn gói vay eligible nào trong "
