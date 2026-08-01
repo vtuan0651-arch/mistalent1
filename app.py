@@ -4034,6 +4034,52 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
             if finance_condition_warning:
                 st.warning(f"⚠️ {finance_condition_warning}")
 
+            st.markdown('<div class="dash-section-title dash-container" style="margin-top: 24px;"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: #3b82f6;"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg> Crisis Approval Gate</div>', unsafe_allow_html=True)
+
+            if "crisis_founder_decision" not in st.session_state:
+                st.session_state.crisis_founder_decision = "Chưa quyết định"
+
+            cbtn_col1, cbtn_col2 = st.columns(2)
+            with cbtn_col1:
+                if st.button("✅ PHÊ DUYỆT", use_container_width=True, type="primary", key="crisis_approve_btn"):
+                    st.session_state.crisis_founder_decision = "✅ Phê duyệt (Approve)"
+            with cbtn_col2:
+                if st.button("❌ TỪ CHỐI", use_container_width=True, key="crisis_reject_btn"):
+                    st.session_state.crisis_founder_decision = "❌ Từ chối (Reject)"
+
+            crisis_founder_decision = st.session_state.crisis_founder_decision
+
+            if crisis_founder_decision == "✅ Phê duyệt (Approve)":
+                st.markdown("""
+<div class="dash-container" style="background: linear-gradient(135deg, #10b981, #059669); padding: 24px; border-radius: 16px; color: white; display: flex; align-items: center; gap: 20px; box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.4); margin-bottom: 15px;">
+<div style="font-size: 3rem; background: rgba(255,255,255,0.2); width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; border-radius: 50%; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">✅</div>
+<div>
+<div style="font-size: 1.5rem; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 4px;">APPROVED</div>
+<div style="font-size: 0.95rem; opacity: 0.95;">Founder đã phê duyệt Crisis Card. Biến động được ghi nhận và triển khai theo phương án đề xuất.</div>
+</div>
+</div>
+                """, unsafe_allow_html=True)
+            elif crisis_founder_decision == "❌ Từ chối (Reject)":
+                st.markdown("""
+<div class="dash-container" style="background: linear-gradient(135deg, #ef4444, #be123c); padding: 24px; border-radius: 16px; color: white; display: flex; align-items: center; gap: 20px; box-shadow: 0 10px 15px -3px rgba(239, 68, 68, 0.4); margin-bottom: 15px;">
+<div style="font-size: 3rem; background: rgba(255,255,255,0.2); width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; border-radius: 50%; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">❌</div>
+<div>
+<div style="font-size: 1.5rem; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 4px;">REJECTED</div>
+<div style="font-size: 0.95rem; opacity: 0.95;">Founder đã từ chối Crisis Card. Biến động này không được áp dụng vào hợp đồng.</div>
+</div>
+</div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+<div class="dash-container" style="background: #f8fafc; border: 2px dashed #cbd5e1; padding: 24px; border-radius: 16px; display: flex; align-items: center; gap: 20px; margin-bottom: 15px;">
+<div style="font-size: 2.5rem; color: #94a3b8; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; background: #f1f5f9; border-radius: 50%;">⏳</div>
+<div>
+<div style="font-size: 1.25rem; font-weight: 800; color: #475569; letter-spacing: 0.05em; margin-bottom: 4px;">PENDING APPROVAL</div>
+<div style="font-size: 0.95rem; color: #64748b;">Đang chờ Founder xem xét biến động và đưa ra quyết định cuối cùng...</div>
+</div>
+</div>
+                """, unsafe_allow_html=True)
+
 
 with tab_dashboard:
     st.markdown(
@@ -4279,6 +4325,9 @@ và khuyến nghị quyết định dành cho Founder.
             "founder_decision": founder_decision,
             "sensitive_threshold_flagged": sensitive,
             "openai_response_ids": [item["response_id"] for item in result["workflow_logs"]],
+            "crisis_card": st.session_state.get("crisis_card"),
+            "crisis_result": st.session_state.get("crisis_result"),
+            "crisis_founder_decision": st.session_state.get("crisis_founder_decision", "Chưa quyết định"),
         }
         st.download_button(
             "Tải Decision Card JSON",
