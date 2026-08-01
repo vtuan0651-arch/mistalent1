@@ -1406,7 +1406,7 @@ class CrisisDelta(BaseModel):
     note: str
 
 class CrisisDecisionCardOutput(BaseModel):
-    continue_contract: Literal["CONTINUE", "CONTINUE_WITH_CONDITIONS", "TERMINATE"]
+    continue_contract: Literal["CONTINUE", "CONTINUE WITH CONDITIONS", "TERMINATE"]
     financing_plan: str
     key_protection_condition: str
     gross_margin_after: float
@@ -1793,7 +1793,7 @@ Nhiệm vụ — trả về CrisisDecisionCardOutput gồm:
 1. continue_contract: chọn đúng 1 trong 3 giá trị:
    - CONTINUE: chỉ số tài chính sau biến động vẫn an toàn (gross_margin >= 0.28,
      closing_cash sau biến động >= 0, không có rủi ro nghiêm trọng mới phát sinh).
-   - CONTINUE_WITH_CONDITIONS: hợp đồng còn khả thi nhưng cần thêm điều kiện ràng
+   - CONTINUE WITH CONDITIONS: hợp đồng còn khả thi nhưng cần thêm điều kiện ràng
      buộc/kiểm soát (VD: gross_margin giảm nhưng vẫn dương, cần huy động vốn ngoài,
      cần đàm phán lại một phần điều khoản với khách hàng).
    - TERMINATE: closing_cash sau biến động < 0 VÀ partner_matrix không có sản phẩm
