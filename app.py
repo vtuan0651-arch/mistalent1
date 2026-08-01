@@ -3791,7 +3791,7 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                         st.error(f"Lỗi hệ thống khi xử lý Crisis: {str(e)}")
 
         if "crisis_result" in st.session_state:
-            st.markdown("### Kết quả Crisis (Before vs After)")
+            st.markdown("### CRISIS CARD")
             c_res = st.session_state.crisis_result
             c_dec = c_res["final_decision"]
             baseline_dec = result["decision_result"]
