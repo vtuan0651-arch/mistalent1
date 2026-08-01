@@ -3606,6 +3606,7 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                                         "severity": "Critical",
                                     }]
                                 ),
+                                "risk_agent_output": None,
                                 "requested_amount_after": 0.0,
                                 "finance_condition_warning": None,
                                 "final_decision": {
@@ -3768,6 +3769,7 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                                     "finance_metrics": fm_after,
                                     "cash_projection": cp_after,
                                     "risk_level_after": risk_level_after,
+                                    "risk_agent_output": r_res_after.model_dump() if r_res_after else None,
                                     "requested_amount_after": requested_amount_after,
                                     "finance_condition_warning": finance_condition_warning,
                                     "final_decision": final_decision.model_dump()
@@ -3801,24 +3803,39 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
             def format_vnd_safe(val):
                 return f"{val:,.0f} VND" if val else "0 VND"
 
-            col1, col2, col3, col4, col5 = st.columns(5)
-            col1.metric("Closing Cash", format_vnd_safe(a_cash), format_vnd_safe(a_cash - b_cash))
-            col2.metric("Risk Level", a_risk, "Old: " + b_risk)
-            # FIX (gây nhầm lẫn): continue_contract (CONTINUE/CONTINUE WITH CONDITIONS/
-            # TERMINATE) và recommendation gốc (ACCEPT/CONDITIONAL_ACCEPT/REJECT/
-            # NEED_MORE_DATA) là 2 thang nhãn KHÁC HỆ THỐNG — trước đây đặt cạnh nhau
-            # dưới dạng "delta" của cùng 1 metric khiến người xem dễ hiểu nhầm là cùng
-            # một thang đo. Nay tách rõ 2 dòng thông tin, không dùng delta cho cặp này.
-            col3.metric("Decision (Sau biến động)", c_dec["continue_contract"])
-            col4.metric("Gross Margin", f"{a_gm:.1%}", f"{(a_gm - b_gm):.1%}")
-            col5.metric("Funding Amount", format_vnd_safe(a_funding), format_vnd_safe(a_funding - b_funding))
+            # Dòng 1: các chỉ số tài chính
+            row1_col1, row1_col2, row1_col3 = st.columns(3)
+            row1_col1.metric("Gross Margin", f"{a_gm:.1%}", f"{(a_gm - b_gm):.1%}")
+            row1_col2.metric("Closing Cash", format_vnd_safe(a_cash), format_vnd_safe(a_cash - b_cash))
+            row1_col3.metric("Funding Amount", format_vnd_safe(a_funding), format_vnd_safe(a_funding - b_funding))
+
+            # Dòng 2: Risk Level (kèm risk summary do AI đề xuất) và Decision (kèm decision summary)
+            row2_col1, row2_col2 = st.columns(2)
+            with row2_col1:
+                st.metric("Risk Level", a_risk, "Old: " + b_risk)
+                risk_agent_output_after = c_res.get("risk_agent_output")
+                if risk_agent_output_after and risk_agent_output_after.get("warnings"):
+                    st.caption("🤖 **Risk Summary (AI):** " + " | ".join(risk_agent_output_after["warnings"]))
+                elif risk_agent_output_after and risk_agent_output_after.get("recommended_controls"):
+                    st.caption("🤖 **Risk Summary (AI):** " + " | ".join(risk_agent_output_after["recommended_controls"]))
+                else:
+                    st.caption("_Không có risk summary từ AI cho biến động này (vượt trần cứng, không qua Risk Agent)._")
+
+            with row2_col2:
+                # FIX (gây nhầm lẫn): continue_contract (CONTINUE/CONTINUE WITH CONDITIONS/
+                # TERMINATE) và recommendation gốc (ACCEPT/CONDITIONAL_ACCEPT/REJECT/
+                # NEED_MORE_DATA) là 2 thang nhãn KHÁC HỆ THỐNG — trước đây đặt cạnh nhau
+                # dưới dạng "delta" của cùng 1 metric khiến người xem dễ hiểu nhầm là cùng
+                # một thang đo. Nay tách rõ 2 dòng thông tin, không dùng delta cho cặp này.
+                st.metric("Decision (Sau biến động)", c_dec["continue_contract"])
+                st.caption(f"📝 **Decision Summary:** {c_dec['executive_summary']}")
+
             st.caption(
                 f"ℹ️ Quyết định gốc trước biến động (thang đánh giá khác — "
                 f"ACCEPT/CONDITIONAL_ACCEPT/REJECT/NEED_MORE_DATA): **{baseline_dec['recommendation']}**. "
                 "Không so sánh trực tiếp 1-1 với continue_contract ở trên vì đây là 2 thang đo khác nhau."
             )
 
-            st.info(f"**Executive Summary (Crisis):** {c_dec['executive_summary']}")
             st.warning(f"**Protection Condition:** {c_dec['key_protection_condition']}")
             st.success(f"**Financing Plan:** {c_dec['financing_plan']}")
 
