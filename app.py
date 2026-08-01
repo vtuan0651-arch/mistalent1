@@ -1815,11 +1815,8 @@ Nhiệm vụ — trả về CrisisDecisionCardOutput gồm:
 5. executive_summary: tóm tắt ngắn gọn bằng tiếng Việt về tác động của biến động
    này lên hợp đồng và lý do đưa ra continue_contract ở trên.
 6. Risk level phải đánh giá đúng tình hình tài chính BEFORE/AFTER:
-   - Nếu closing_cash_after tăng và requested_amount_after giảm so với baseline_context
-     thì xu hướng risk phải giảm (trừ khi vẫn còn triggered rule severity Critical).
-   - Nếu closing_cash_after giảm và requested_amount_after tăng so với baseline_context
-     thì xu hướng risk phải tăng.
-   - Không tự đặt risk_level trái với triggered_rules/risk_level đã có trong payload.
+    - Đánh giá dựa trên bảng risk rule: Nếu không vi phạm risk rule mới thì không thay đổi mức độ risk rule 
+    - Không tự đặt risk_level trái với triggered_rules/risk_level đã có trong payload.
 Quy tắc bắt buộc:
 - Không phát minh số liệu, sản phẩm tín dụng hay điều khoản ngoài payload.
 - Không tự đổi requested_amount hay eligible của partner_matrix.
@@ -3781,7 +3778,7 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
             col1, col2, col3, col4, col5 = st.columns(5)
             col1.metric("Closing Cash", format_vnd_safe(a_cash), format_vnd_safe(a_cash - b_cash))
             col2.metric("Risk Level", a_risk, "Old: " + b_risk)
-            # FIX (gây nhầm lẫn): continue_contract (CONTINUE/CONTINUE_WITH_CONDITIONS/
+            # FIX (gây nhầm lẫn): continue_contract (CONTINUE/CONTINUE WITH CONDITIONS/
             # TERMINATE) và recommendation gốc (ACCEPT/CONDITIONAL_ACCEPT/REJECT/
             # NEED_MORE_DATA) là 2 thang nhãn KHÁC HỆ THỐNG — trước đây đặt cạnh nhau
             # dưới dạng "delta" của cùng 1 metric khiến người xem dễ hiểu nhầm là cùng
