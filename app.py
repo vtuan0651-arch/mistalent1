@@ -1792,7 +1792,7 @@ Nhiệm vụ — trả về CrisisDecisionCardOutput gồm:
 6. Risk level phải đánh giá đúng tình hình tài chính BEFORE/AFTER:
     - Đánh giá dựa trên bảng risk rule: Nếu không vi phạm risk rule mới thì không thay đổi mức độ risk rule 
     - Không tự đặt risk_level trái với triggered_rules/risk_level đã có trong payload.
-7. Risk summary: cảnh báo 1 điểm cần đặc biệt lưu ý dựa theo mức độ thay đổi của số liệu. Ngắn gọn trong 1 dòng. 
+7. Risk summary: (tối đa 2 dòng)cảnh báo 1 điểm cần đặc biệt lưu ý dựa theo mức độ thay đổi của số liệu.  
 Quy tắc bắt buộc:
 - Không phát minh số liệu, sản phẩm tín dụng hay điều khoản ngoài payload.
 - Không tự đổi requested_amount hay eligible của partner_matrix.
