@@ -1430,47 +1430,6 @@ def derive_risk_level_from_triggered_rules(triggered_rules: list[dict]) -> str:
         return "MEDIUM"
     return "LOW"
 
-
-def adjust_crisis_risk_level_by_financial_delta(
-    base_risk_level: str,
-    before_min_closing_cash: float,
-    after_min_closing_cash: float,
-    before_requested_amount: float,
-    after_requested_amount: float,
-    triggered_rules: list[dict],
-) -> str:
-    """Điều chỉnh risk level theo biến động tài chính trong Crisis.
-
-    Rule:
-    - Nếu closing cash tăng VÀ nhu cầu vay giảm -> hạ 1 mức risk (trừ khi còn Critical).
-    - Nếu closing cash giảm VÀ nhu cầu vay tăng -> nâng 1 mức risk.
-    - Các trường hợp còn lại giữ nguyên base_risk_level.
-    """
-    normalized_base = str(base_risk_level or "LOW").strip().upper()
-    if normalized_base not in CRISIS_RISK_LEVEL_ORDER:
-        normalized_base = derive_risk_level_from_triggered_rules(triggered_rules)
-
-    epsilon = 1e-6
-    improved_cash = (after_min_closing_cash - before_min_closing_cash) > epsilon
-    reduced_funding_need = (before_requested_amount - after_requested_amount) > epsilon
-    worsened_cash = (before_min_closing_cash - after_min_closing_cash) > epsilon
-    increased_funding_need = (after_requested_amount - before_requested_amount) > epsilon
-
-    severities = {
-        str(rule.get("severity", "")).strip().upper()
-        for rule in (triggered_rules or [])
-    }
-    has_critical = "CRITICAL" in severities
-    level_index = CRISIS_RISK_LEVEL_ORDER.index(normalized_base)
-
-    if improved_cash and reduced_funding_need and not has_critical:
-        return CRISIS_RISK_LEVEL_ORDER[max(0, level_index - 1)]
-
-    if worsened_cash and increased_funding_need:
-        return CRISIS_RISK_LEVEL_ORDER[min(len(CRISIS_RISK_LEVEL_ORDER) - 1, level_index + 1)]
-
-    return normalized_base
-
 def resolve_crisis_deltas(crisis: CrisisCardInput, list_price_goc: float, old_num_provinces: Optional[int] = None) -> CrisisDelta:
     extra_oper = 0.0
     extra_estimated_cost = 0.0
@@ -1482,19 +1441,19 @@ def resolve_crisis_deltas(crisis: CrisisCardInput, list_price_goc: float, old_nu
 
     for group in crisis.crisis_group:
         if group == "DEADLINE_EARLY":
-            if crisis.days_deviation and crisis.days_deviation > 7:
+            if crisis.days_deviation and crisis.days_deviation >= 7:
                 extra_oper += 0.01
                 extra_list_price += list_price_goc * 0.015
-                notes.append(f"Giao sớm {crisis.days_deviation} ngày (>7 ngày): oper +1%, list price +1.5%")
+                notes.append(f"Giao sớm {crisis.days_deviation} ngày (>=7 ngày): oper +1%, list price +1.5%")
             elif crisis.days_deviation and crisis.days_deviation > 0:
                 extra_oper += 0.005
                 extra_list_price += list_price_goc * 0.01
                 notes.append(f"Giao sớm {crisis.days_deviation} ngày (<7 ngày): oper +0.5%, list price +1%")
         elif group == "DEADLINE_LATE":
-            if crisis.days_deviation and crisis.days_deviation > 7:
+            if crisis.days_deviation and crisis.days_deviation >= 7:
                 extra_oper += 0.005
                 extra_estimated_cost += list_price_goc * 0.015
-                notes.append(f"Giao muộn {crisis.days_deviation} ngày (>7 ngày): oper +0.5%, estimated cost +1.5% giá trị HĐ")
+                notes.append(f"Giao muộn {crisis.days_deviation} ngày (>= 7 ngày): oper +0.5%, estimated cost +1.5% giá trị HĐ")
             elif crisis.days_deviation and crisis.days_deviation > 0:
                 extra_oper += 0.0005
                 extra_estimated_cost += list_price_goc * 0.01
