@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import re
 import time
 from io import BytesIO, StringIO
 from typing import Annotated, Literal, Optional
@@ -126,21 +127,34 @@ class DecisionAgentOutput(BaseModel):
 
 # ============================================================
 # 2.5 DATA MASKING — API-H-004 / API-H-007 (22_API_HANDLING_RULES)
-#     theo đúng ví dụ trong 21_MASKING_EXAMPLES.
+#     theo đúng ví dụ trong 21_MASKING_EXAMPLES, và theo đúng quy trình
+#     3 bước mô tả trong Báo cáo mục 8.4:
+#       BƯỚC 1 — Inbound Processing & Masking: dò PII bằng (a) so khớp tên
+#                field đã biết VÀ (b) quét REGEX trên nội dung chuỗi (bắt các
+#                PII "trôi nổi" trong text tự do, không nằm trong field cố
+#                định), rồi thay bằng Token chuẩn hóa; lưu Bảng Ánh xạ
+#                (Mapping Table) tạm thời trong bộ nhớ (st.session_state).
+#       BƯỚC 2 — External AI Agent Processing: payload đã mask được gửi cho
+#                OpenAI (xem run_finance_agent/run_risk_agent/run_decision_agent).
+#       BƯỚC 3 — Outbound Unmasking: tra Bảng Ánh xạ để phục hồi PII thật khi
+#                cần hiển thị lại cho Founder (xem unmask_sensitive_fields()).
 #
-#     Hàm này CHỈ tạo ra một BẢN SAO đã che dữ liệu để gửi cho OpenAI —
+#     Hàm mask CHỈ tạo ra một BẢN SAO đã che dữ liệu để gửi cho OpenAI —
 #     không sửa đổi bất kỳ biến gốc nào dùng cho tính toán/hiển thị UI,
 #     nên không ảnh hưởng tới logic nghiệp vụ hiện có.
 # ============================================================
 
 # Định danh hạn chế (restricted identifier) — theo 20_DATA_CLASS:
 # "Do not send raw value across trust boundary" -> tokenize deterministically.
+# Lưu ý: dùng SUBSTRING match (không chỉ exact match) ở _match_restricted_id_key()
+# bên dưới, để vẫn bắt được các biến thể tên field như "primary_customer_id",
+# "billing_account_id"... chứ không bỏ sót chỉ vì tên field không khớp tuyệt đối.
 RESTRICTED_ID_FIELDS = {"customer_id", "account_id", "counterparty_id", "company_id"}
 _RESTRICTED_ID_TOKEN_PREFIX = {
-    "customer_id": "CUS",
-    "account_id": "ACC",
-    "counterparty_id": "CUS",
-    "company_id": "ORG",
+    "customer_id": "CUSTOMER",
+    "account_id": "ACCOUNT",
+    "counterparty_id": "CUSTOMER",
+    "company_id": "COMPANY",
 }
 
 # Tên định danh doanh nghiệp/khách hàng — theo dòng "company_name" trong
@@ -157,14 +171,86 @@ AGGREGATE_AMOUNT_FIELDS = {"contract_value"}
 SECRET_FIELD_MARKERS = {"access_token", "api_key", "secret", "password", "token"}
 
 
-def _deterministic_token(prefix: str, raw_value) -> str:
+def _match_restricted_id_key(lower_key: str) -> Optional[str]:
+    """Substring match (thay vì exact match) để không bỏ sót biến thể tên field."""
+    for field_name, prefix in _RESTRICTED_ID_TOKEN_PREFIX.items():
+        if field_name in lower_key:
+            return prefix
+    return None
+
+
+def _is_name_key(lower_key: str) -> bool:
+    return any(name_field in lower_key for name_field in NAME_FIELDS_TO_MASK)
+
+
+def _is_amount_key(lower_key: str) -> bool:
+    return any(amount_field in lower_key for amount_field in AGGREGATE_AMOUNT_FIELDS)
+
+
+# ------------------------------------------------------------------
+# BƯỚC 1 (phần b) — quét PII theo REGEX ngay trong NỘI DUNG chuỗi, độc lập
+# với tên field. Bắt các trường hợp email/SĐT/số CCCD "trôi nổi" trong các
+# trường text tự do (vd. ghi chú, key_observations) mà danh sách field cố
+# định RESTRICTED_ID_FIELDS/NAME_FIELDS_TO_MASK phía trên không có tên.
+# ------------------------------------------------------------------
+_EMAIL_PATTERN = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+_VN_PHONE_PATTERN = re.compile(r"(?<!\d)(?:\+84|0)(?:\d[\s.-]?){8,9}\d(?!\d)")
+_CCCD_PATTERN = re.compile(r"(?<!\d)\d{12}(?!\d)")
+
+_CONTENT_PII_PATTERNS = (
+    ("EMAIL", _EMAIL_PATTERN),
+    ("PHONE", _VN_PHONE_PATTERN),
+    ("CCCD", _CCCD_PATTERN),
+)
+
+
+def _scrub_pii_patterns(text: str) -> tuple[str, bool]:
+    """Quét regex trên 1 chuỗi, trả về (chuỗi đã che, có phát hiện PII hay không)."""
+    found = False
+    scrubbed = text
+    for label, pattern in _CONTENT_PII_PATTERNS:
+        if pattern.search(scrubbed):
+            found = True
+            scrubbed = pattern.sub(f"[MASKED_{label}]", scrubbed)
+    return scrubbed, found
+
+
+# ------------------------------------------------------------------
+# BƯỚC 1 (phần a) + BƯỚC 3 — Bảng Ánh xạ (Mapping Table) lưu tạm trong RAM.
+# Dùng st.session_state (không dùng biến module-level thường) vì Streamlit
+# rerun lại toàn bộ script mỗi lần tương tác — session_state là nơi duy nhất
+# "RAM tạm thời" thực sự tồn tại xuyên suốt 1 phiên làm việc của Founder,
+# đúng như mô tả trong Báo cáo mục 8.4 Bước 1: "Bảng Ánh xạ được lưu tạm
+# thời vào RAM nội bộ". Bảng này cho phép:
+#   (1) cùng một giá trị gốc luôn nhận cùng 1 token (persistent linkage);
+#   (2) unmask_sensitive_fields() tra ngược token -> giá trị gốc (BƯỚC 3).
+# ------------------------------------------------------------------
+def _get_masking_state() -> dict:
+    return st.session_state.setdefault(
+        "_masking_map",
+        {"table": {}, "reverse": {}, "seq": {}},
+    )
+
+
+def _sequential_token(prefix: str, raw_value) -> str:
     """
-    Sinh token cố định (persistent linkage) cho cùng một giá trị gốc, để Agent
-    vẫn có thể tham chiếu "cùng một khách hàng" xuyên suốt 1 lượt chạy mà không
-    lộ định danh thật — đúng tinh thần cột allowed_for_partner_api = "Tokenized only".
+    Sinh token chuẩn hóa dạng [MASKED_<LOAI>_<STT>] (vd [MASKED_CUSTOMER_01])
+    tra cứu/ghi qua Bảng Ánh xạ trong st.session_state — đúng mô tả BƯỚC 1
+    của Báo cáo. Cùng 1 giá trị gốc -> luôn cùng 1 token trong suốt phiên
+    làm việc (persistent linkage, để 3 Agent vẫn tham chiếu "cùng 1 khách
+    hàng" mà không lộ định danh thật); giá trị khác nhau -> token khác nhau.
     """
-    digest = hashlib.sha256(f"{prefix}::{raw_value}".encode("utf-8")).hexdigest()[:6].upper()
-    return f"TOK-{prefix}-{digest}"
+    state = _get_masking_state()
+    reverse_key = f"{prefix}::{raw_value}"
+    existing = state["reverse"].get(reverse_key)
+    if existing:
+        return existing
+    seq = state["seq"].get(prefix, 0) + 1
+    state["seq"][prefix] = seq
+    token = f"[MASKED_{prefix}_{seq:02d}]"
+    state["table"][token] = raw_value
+    state["reverse"][reverse_key] = token
+    return token
 
 
 _LEGAL_SUFFIX_WHITELIST = {"co", "ltd", "jsc", "corp", "inc", "plc", "llc", "cty"}
@@ -210,21 +296,38 @@ def _mask_value_recursive(value, masked_fields: set):
                 # cho OpenAI hay ghi log — loại bỏ hẳn khỏi payload.
                 masked_fields.add(key)
                 continue
-            if lower_key in RESTRICTED_ID_FIELDS and sub_value is not None:
-                prefix = _RESTRICTED_ID_TOKEN_PREFIX.get(lower_key, "ID")
-                result[key] = _deterministic_token(prefix, sub_value)
+            restricted_prefix = _match_restricted_id_key(lower_key)
+            if restricted_prefix and sub_value is not None:
+                result[key] = _sequential_token(restricted_prefix, sub_value)
                 masked_fields.add(key)
-            elif lower_key in NAME_FIELDS_TO_MASK and sub_value:
+            elif _is_name_key(lower_key) and sub_value:
                 result[key] = _partial_mask_name(sub_value)
                 masked_fields.add(key)
-            elif lower_key in AGGREGATE_AMOUNT_FIELDS and sub_value is not None:
+            elif _is_amount_key(lower_key) and sub_value is not None:
                 result[key] = _band_amount(sub_value)
                 masked_fields.add(key)
+            elif isinstance(sub_value, str):
+                # BƯỚC 1 (phần b): field không nằm trong danh sách cố định nào
+                # ở trên, nhưng vẫn quét REGEX theo nội dung để bắt PII "trôi
+                # nổi" trong text tự do (email, SĐT, số CCCD...).
+                scrubbed, found = _scrub_pii_patterns(sub_value)
+                result[key] = scrubbed
+                if found:
+                    masked_fields.add(key)
             else:
                 result[key] = _mask_value_recursive(sub_value, masked_fields)
         return result
     if isinstance(value, list):
-        return [_mask_value_recursive(item, masked_fields) for item in value]
+        result_list = []
+        for item in value:
+            if isinstance(item, str):
+                scrubbed, found = _scrub_pii_patterns(item)
+                if found:
+                    masked_fields.add("(free_text_in_list)")
+                result_list.append(scrubbed)
+            else:
+                result_list.append(_mask_value_recursive(item, masked_fields))
+        return result_list
     return value
 
 
@@ -234,11 +337,45 @@ def mask_sensitive_fields(payload: dict) -> tuple[dict, list[str]]:
       1. Gửi cho OpenAI thay cho payload gốc (API-H-004).
       2. Ghi vào workflow_logs làm "masked_fields" theo đúng field
          25_RUNTIME_LOG_SCHEMA (bằng chứng đã che dữ liệu — API-H-007).
-    Không sửa payload gốc (deep copy khi duyệt đệ quy).
+    Không sửa payload gốc (deep copy khi duyệt đệ quy). Việc dò PII kết hợp
+    cả (a) so khớp tên field đã biết và (b) quét regex theo nội dung chuỗi
+    (xem BƯỚC 1 ở đầu file) — đúng mô tả 2 lớp trong Báo cáo mục 8.4.
     """
     masked_fields: set[str] = set()
     masked_payload = _mask_value_recursive(payload, masked_fields)
     return masked_payload, sorted(masked_fields)
+
+
+def unmask_sensitive_fields(masked_value):
+    """
+    BƯỚC 3 — OUTBOUND UNMASKING (Báo cáo mục 8.4): tra Bảng Ánh xạ (Mapping
+    Table) trong st.session_state để phục hồi PII thật từ token
+    "[MASKED_..._NN]" hoặc "[MASKED_EMAIL]/[MASKED_PHONE]/[MASKED_CCCD]" xuất
+    hiện trong dict/list/chuỗi đầu vào — kể cả khi token nằm lồng bên trong
+    một câu văn tự do do LLM sinh ra (vd trong summary/warnings).
+    Dùng khi cần hiển thị lại dữ liệu thật cho Founder sau khi Agent đã suy
+    luận xong trên bản đã mask. Không đụng tới payload gốc dùng để tính toán
+    Python (payload đó vốn chưa từng bị mask nên không cần unmask).
+    Lưu ý: chỉ phục hồi được các token do tokenize sinh ra ([MASKED_..._NN]);
+    các mẫu regex nội dung như [MASKED_EMAIL] không lưu giá trị gốc (bị xóa
+    hẳn theo API-H-004/API-H-007) nên sẽ được giữ nguyên dạng token.
+    """
+    table = _get_masking_state()["table"]
+
+    def _restore(value):
+        if isinstance(value, dict):
+            return {k: _restore(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [_restore(item) for item in value]
+        if isinstance(value, str):
+            restored = value
+            for token, raw_value in table.items():
+                if token in restored:
+                    restored = restored.replace(token, str(raw_value))
+            return restored
+        return value
+
+    return _restore(masked_value)
 
 
 # ============================================================
@@ -3496,13 +3633,21 @@ trước khi ra Decision Card.
                             )
                         else:
                             st.info("Không có field nhạy cảm nào trong payload của agent này.")
-                        col_before, col_after = st.columns(2)
+                        col_before, col_after, col_unmask = st.columns(3)
                         with col_before:
                             st.markdown("**OPC data**")
                             st.json(debug_info["before_mask"])
                         with col_after:
                             st.markdown("**Data Masking**")
                             st.json(debug_info["after_mask"])
+                        with col_unmask:
+                            st.markdown("**Unmask lại (tra Mapping Table)**")
+                            st.caption(
+                                "Bước 3 — Outbound Unmasking: tra Bảng Ánh xạ trong "
+                                "session để phục hồi PII thật từ token. Nếu khớp với "
+                                "cột OPC data bên trái, Mapping Table hoạt động đúng."
+                            )
+                            st.json(unmask_sensitive_fields(debug_info["after_mask"]))
 
             with st.expander("🔒 Kiểm tra tuân thủ gọi API (22_API_HANDLING_RULES)", expanded=False):
                 st.caption(
