@@ -3574,7 +3574,13 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                             st.session_state.crisis_result = {
                                 "finance_metrics": baseline_metrics,
                                 "cash_projection": result.get("cash_projection", {}),
-                                "risk_level_after": "CRITICAL",
+                                "risk_level_after": derive_risk_level_from_triggered_rules(
+                                    [{
+                                        "rule_id": "ORDER_HARD_CAP_EXCEEDED",
+                                        "description": delta.note,
+                                        "severity": "Critical",
+                                    }]
+                                ),
                                 "requested_amount_after": 0.0,
                                 "finance_condition_warning": None,
                                 "final_decision": {
