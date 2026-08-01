@@ -3964,14 +3964,28 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
             b_funding = result.get("decision_result", {}).get("funding_amount", 0.0)
             a_funding = c_dec.get("funding_amount_after", b_funding)
 
+            # Confidence Score — hiển thị cùng hàng với Funding Amount theo yêu cầu.
+            b_confidence = result.get("decision_result", {}).get("confidence_score")
+            a_confidence = c_dec.get("confidence_score_after", b_confidence)
+
             def format_vnd_safe(val):
                 return f"{val:,.0f} VND" if val else "0 VND"
 
-            # Dòng 1: các chỉ số tài chính
-            row1_col1, row1_col2, row1_col3 = st.columns(3)
+            def format_confidence_safe(val):
+                return f"{val:.0%}" if val is not None else "N/A"
+
+            confidence_delta = (
+                f"{(a_confidence - b_confidence):.0%}"
+                if a_confidence is not None and b_confidence is not None
+                else None
+            )
+
+            # Dòng 1: các chỉ số tài chính — Confidence Score đặt cùng hàng với Funding Amount
+            row1_col1, row1_col2, row1_col3, row1_col4 = st.columns(4)
             row1_col1.metric("Gross Margin", f"{a_gm:.1%}", f"{(a_gm - b_gm):.1%}")
             row1_col2.metric("Closing Cash", format_vnd_safe(a_cash), format_vnd_safe(a_cash - b_cash))
             row1_col3.metric("Funding Amount", format_vnd_safe(a_funding), format_vnd_safe(a_funding - b_funding))
+            row1_col4.metric("Confidence Score", format_confidence_safe(a_confidence), confidence_delta)
 
             # Dòng 2: Risk Level (kèm risk summary do AI đề xuất) và Decision (kèm decision summary) —
             # gộp chung vào 1 khối thẻ (card) duy nhất cho mỗi bên, thay vì tách metric/caption rời nhau.
