@@ -3856,7 +3856,7 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                 # một thang đo. Nay tách rõ 2 dòng thông tin, không dùng delta cho cặp này.
                 st.markdown(f"""
 <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:16px 20px;box-shadow:0 4px 16px rgba(15,23,42,0.04);height:100%;">
-<div style="text-transform:uppercase;letter-spacing:0.04em;font-size:0.85rem;color:#64748b;font-weight:700;margin-bottom:6px;">Decision (Sau biến động)</div>
+<div style="text-transform:uppercase;letter-spacing:0.04em;font-size:0.85rem;color:#64748b;font-weight:700;margin-bottom:6px;">Recommend Decision</div>
 <div style="font-size:1.9rem;font-weight:800;color:#0f172a;margin-bottom:8px;">{c_dec["continue_contract"]}</div>
 <div style="border-top:1px solid #e2e8f0;margin:8px 0;"></div>
 <div style="font-size:1rem;color:#334155;line-height:1.6;">{decision_summary_text}</div>
