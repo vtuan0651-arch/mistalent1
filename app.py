@@ -2661,7 +2661,7 @@ div[data-testid="stTabs"] div[data-testid="stMetric"] {
 div[data-testid="stTabs"] div[data-testid="stMetricLabel"] {
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    font-size: 0.76rem !important;
+    font-size: 2 rem !important;
     color: #64748b !important;
     font-weight: 700 !important;
     white-space: normal !important;
@@ -3357,10 +3357,10 @@ trước khi ra Decision Card.
                             st.info("Không có field nhạy cảm nào trong payload của agent này.")
                         col_before, col_after = st.columns(2)
                         with col_before:
-                            st.markdown("**Trước khi mask (dữ liệu thật, KHÔNG gửi đi)**")
+                            st.markdown("**OPC data**")
                             st.json(debug_info["before_mask"])
                         with col_after:
-                            st.markdown("**Sau khi mask (payload THẬT SỰ gửi cho OpenAI)**")
+                            st.markdown("**Data Masking**")
                             st.json(debug_info["after_mask"])
 
             with st.expander("🔒 Kiểm tra tuân thủ gọi API (22_API_HANDLING_RULES)", expanded=False):
