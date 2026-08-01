@@ -1503,6 +1503,7 @@ class CrisisDelta(BaseModel):
 class CrisisDecisionCardOutput(BaseModel):
     continue_contract: Literal["CONTINUE", "CONTINUE WITH CONDITIONS", "TERMINATE"]
     financing_plan: str
+    confidence_score_after: Optional[float] = None   # THÊM MỚI
     key_protection_condition: str
     gross_margin_after: float
     closing_cash_after: float
@@ -1864,7 +1865,7 @@ sinh trên 1 hợp đồng đang chạy).
 Dữ liệu đầu vào (payload) gồm: crisis_context (nhóm biến động + delta đã tính),
 finance_metrics (SAU biến động), cash_projection (SAU biến động), partner_matrix
 (SAU biến động, đã lọc theo Mục 4), requested_amount, triggered_rules, risk_level,
-baseline_context, founder_approval_needed, finance_agent_output, risk_agent_output.
+baseline_context, founder_approval_needed, finance_agent_output, risk_agent_output,confidence_result_after.
 
 Nhiệm vụ — trả về CrisisDecisionCardOutput gồm:
 1. continue_contract: chọn đúng 1 trong 3 giá trị:
@@ -1885,7 +1886,7 @@ Nhiệm vụ — trả về CrisisDecisionCardOutput gồm:
    giải ngân theo tiến độ, tài sản đảm bảo, đàm phán lại thời hạn thanh toán...).
    Phải bám sát đúng crisis_context và triggered_rules được cung cấp, không chung
    chung, không lặp lại nguyên văn financing_plan.
-4. gross_margin_after, closing_cash_after, funding_amount_after: PHẢI lấy đúng
+4. gross_margin_after, closing_cash_after, funding_amount_after,confidence_result_after: PHẢI lấy đúng
    nguyên giá trị Python đã cung cấp trong finance_metrics/cash_projection/
    requested_amount — không tự tính lại, không làm tròn khác đi (các trường này
    vẫn bị Python enforce lại sau, nhưng vẫn phải điền đúng ngay từ đầu).
@@ -2035,6 +2036,10 @@ def enforce_crisis_decision_card(
     # Nếu Agent đã tự trả TERMINATE thì giữ nguyên (không đổi lý do/summary của
     # Agent một cách không cần thiết).
     mandatory_terminate_reasons = []
+    if cp_after["cash_reserve_breach"] and (confidence_result_after is None or confidence_result_after["confidence_score"] < 0.65):
+    mandatory_terminate_reasons.append(
+        "post-crisis cash breach kèm confidence_score < 0.65 (RR-006) — độ tin cậy dữ liệu quá thấp để tiếp tục"
+    )
     if min_cash < 0 and not has_financing:
         mandatory_terminate_reasons.append(
             "closing cash sau biến động < 0 và không còn gói vay eligible nào trong "
@@ -2063,6 +2068,10 @@ def enforce_crisis_decision_card(
             "closing_cash_after": min_cash,
             "funding_amount_after": enforced_funding_amount,
             "executive_summary": enforced_executive_summary,
+            "confidence_score_after": (                                   # THÊM MỚI
+                confidence_result_after["confidence_score"]
+                if confidence_result_after is not None else None
+        ),
         }
     )
 
@@ -3811,7 +3820,15 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                             # thực sự eligible" (đúng bản fix đã ghi chú ở Mục 6, không được bỏ qua
                             # riêng cho Crisis Card).
                             requested_amount_after = determine_requested_amount(cp_after, pm_after)
-                        
+                            # THÊM MỚI: tính lại Confidence Score với dữ liệu SAU biến động
+                            # (trước đây bị bỏ sót — dùng lại confidence_result cũ của baseline)
+                            confidence_result_after = compute_confidence_score(
+                                cash_projection=cp_after,
+                                partner_matrix=pm_after,
+                                total_list_price=fm_after["total_list_price"],
+                                funding_amount=requested_amount_after,
+                                province=result["customer"].get("province"),
+                            )
                             client = OpenAI(api_key=api_key)
                             crisis_context = {
                                 "crisis_group": crisis_obj.crisis_group,
@@ -3827,7 +3844,7 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                                 "opportunity": result["opportunity"],
                                 "finance_metrics": fm_after,
                                 "cash_projection": cp_after,
-                                "confidence_result": result.get("confidence_result"),
+                                "confidence_result": confidence_result_after,
                                 "missing_fields": result.get("missing_fields", []),
                                 "crisis_context": crisis_context
                             }
@@ -3838,7 +3855,7 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                                 sys_data,
                                 fm_after,
                                 cp_after,
-                                result.get("confidence_result"),
+                                confidence_result_after,
                             )
                             triggered_after = list(risk_eval_after.get("triggered_rules", []))
                             triggered_ids_after = {
@@ -3873,7 +3890,7 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                                 "finance_agent_output": f_res_after.model_dump() if f_res_after else {},
                                 "finance_metrics": fm_after,
                                 "cash_projection": cp_after,
-                                "confidence_result": result.get("confidence_result"),
+                                "confidence_result": confidence_result_after,
                                 "triggered_rules": triggered_after,
                                 "risk_level": risk_level_after,
                                 "missing_fields": result.get("missing_fields", []),
@@ -3886,7 +3903,7 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                                 "customer": result["customer"],
                                 "finance_metrics": fm_after,
                                 "cash_projection": cp_after,
-                                "confidence_result": result.get("confidence_result"),
+                                "confidence_result": confidence_result_after,
                                 "finance_agent_output": f_res_after.model_dump() if f_res_after else {},
                                 "risk_agent_output": r_res_after.model_dump() if r_res_after else {},
                                 "triggered_rules": triggered_after,
