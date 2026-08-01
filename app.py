@@ -2533,16 +2533,149 @@ div[data-testid="stTabs"] [data-baseweb="tab-highlight"] {
 div[data-testid="stTabs"] [data-baseweb="tab-border"] {
     background-color: #e2e8f0 !important;
 }
+
+/* ================== OPERATIONS TAB — REDESIGN (card trắng bo tròn, KPI card) ================== */
+
+.ops-hero {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    padding: 26px 30px;
+    margin-bottom: 22px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+}
+.ops-hero-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+}
+.ops-hero-desc {
+    color: #64748b;
+    font-size: 0.98rem;
+    line-height: 1.6;
+    max-width: 900px;
+}
+
+.ops-section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 2px 0 4px 0;
+    letter-spacing: -0.01em;
+}
+.ops-section-desc {
+    color: #64748b;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin-bottom: 16px;
+}
+
+/* Form nhập liệu -> card trắng bo tròn, viền mềm, đổ bóng nhẹ */
+div[data-testid="stTabs"] div[data-testid="stForm"] {
+    background: #ffffff;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 18px;
+    padding: 20px 20px 6px 20px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+}
+
+/* Vùng tải file -> card trắng bo tròn */
+div[data-testid="stTabs"] [data-testid="stFileUploaderDropzone"] {
+    background: #f8fafc !important;
+    border: 1.5px dashed #cbd5e1 !important;
+    border-radius: 14px !important;
+}
+div[data-testid="stTabs"] div[data-testid="stFileUploader"] {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
+    padding: 16px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+    margin-bottom: 16px;
+}
+
+/* st.metric -> KPI card giống các thẻ chỉ số trên cùng của ảnh mẫu */
+div[data-testid="stTabs"] div[data-testid="stMetric"] {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 16px 20px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+}
+div[data-testid="stTabs"] div[data-testid="stMetricLabel"] {
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.76rem !important;
+    color: #64748b !important;
+    font-weight: 700 !important;
+}
+div[data-testid="stTabs"] div[data-testid="stMetricValue"] {
+    font-size: 1.65rem !important;
+    font-weight: 800 !important;
+    color: #0f172a !important;
+}
+
+/* Expander -> card trắng bo tròn, giống card biểu đồ trong ảnh */
+div[data-testid="stTabs"] [data-testid="stExpander"] {
+    background: #ffffff;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 16px !important;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+    overflow: hidden;
+    margin-bottom: 14px;
+}
+div[data-testid="stTabs"] [data-testid="stExpander"] summary {
+    padding: 14px 18px !important;
+}
+
+/* Dataframe -> card bo tròn, viền mềm */
+div[data-testid="stTabs"] [data-testid="stDataFrame"] {
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+/* Alert (info/success/error) -> bo tròn mềm mại hơn, giống badge trong ảnh */
+div[data-testid="stTabs"] div[data-testid="stAlert"] {
+    border-radius: 14px !important;
+    border: 1px solid transparent;
+}
 </style>
 """, unsafe_allow_html=True)
 
 tab_ops, tab_crisis, tab_dashboard = st.tabs(["⚙️ Operations (Input & Workflow)", "🆘 Crisis Card", "🏆 Decision Dashboard"])
 
 with tab_ops:
+    st.markdown(
+        """
+<div class="ops-hero">
+<div class="ops-hero-title">⚙️ Operations Console</div>
+<div class="ops-hero-desc">
+Trung tâm vận hành của OPC Multi-Agent Decision System — tải Team Pack, khởi tạo cơ hội kinh doanh
+và theo dõi trực tiếp luồng xử lý của 3 AI Agent (Data &amp; Finance → Risk &amp; Compliance → Decision &amp; Partner)
+trước khi ra Decision Card.
+</div>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     col_input, col_workflow = st.columns([1.0, 2.2], gap="large")
 
     with col_input:
-        st.subheader("1. Input Data")
+        st.markdown(
+            '<div class="ops-section-title">📥 1. Input Data</div>'
+            '<div class="ops-section-desc">Tải Team Pack Excel và nhập thông tin cơ hội kinh doanh.</div>',
+            unsafe_allow_html=True,
+        )
         uploaded_file = st.file_uploader(
             "Tải Team Pack Excel",
             type=["xlsx"],
@@ -2944,7 +3077,11 @@ with tab_ops:
 
 
     with col_workflow:
-        st.subheader("2. Agent Workflow")
+        st.markdown(
+            '<div class="ops-section-title">🔄 2. Agent Workflow</div>'
+            '<div class="ops-section-desc">Theo dõi luồng xử lý theo thời gian thực của 3 AI Agent.</div>',
+            unsafe_allow_html=True,
+        )
         if not result:
             st.info("Workflow sẽ xuất hiện sau khi chạy hệ thống.")
         else:
