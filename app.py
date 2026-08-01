@@ -2706,6 +2706,11 @@ div[data-testid="stTabs"] div[data-testid="stAlert"] {
     border-radius: 14px !important;
     border: 1px solid transparent;
 }
+div[data-testid="stTabs"] div[data-testid="stAlert"] p,
+div[data-testid="stTabs"] div[data-testid="stAlert"] div[data-testid="stMarkdownContainer"] {
+    font-size: 1rem !important;
+    line-height: 1.6 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -3835,11 +3840,11 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
             with row2_col1:
                 st.markdown(f"""
 <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:16px 20px;box-shadow:0 4px 16px rgba(15,23,42,0.04);height:100%;">
-<div style="text-transform:uppercase;letter-spacing:0.04em;font-size:0.76rem;color:#64748b;font-weight:700;margin-bottom:4px;">Risk Level</div>
-<div style="font-size:1.5rem;font-weight:800;color:{risk_color};margin-bottom:6px;">{a_risk}</div>
-<div style="display:inline-block;background:#f1f5f9;color:#64748b;font-size:0.78rem;font-weight:600;padding:2px 10px;border-radius:8px;margin-bottom:10px;">Old: {b_risk}</div>
+<div style="text-transform:uppercase;letter-spacing:0.04em;font-size:0.85rem;color:#64748b;font-weight:700;margin-bottom:6px;">Risk Level</div>
+<div style="font-size:1.9rem;font-weight:800;color:{risk_color};margin-bottom:8px;">{a_risk}</div>
+<div style="display:inline-block;background:#f1f5f9;color:#64748b;font-size:0.9rem;font-weight:600;padding:3px 12px;border-radius:8px;margin-bottom:12px;">Old: {b_risk}</div>
 <div style="border-top:1px solid #e2e8f0;margin:8px 0;"></div>
-<div style="font-size:0.85rem;color:#334155;line-height:1.5;">{risk_summary_text}</div>
+<div style="font-size:1rem;color:#334155;line-height:1.6;">{risk_summary_text}</div>
 </div>
                 """, unsafe_allow_html=True)
 
@@ -3851,17 +3856,20 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                 # một thang đo. Nay tách rõ 2 dòng thông tin, không dùng delta cho cặp này.
                 st.markdown(f"""
 <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:16px 20px;box-shadow:0 4px 16px rgba(15,23,42,0.04);height:100%;">
-<div style="text-transform:uppercase;letter-spacing:0.04em;font-size:0.76rem;color:#64748b;font-weight:700;margin-bottom:4px;">Decision (Sau biến động)</div>
-<div style="font-size:1.5rem;font-weight:800;color:#0f172a;margin-bottom:6px;">{c_dec["continue_contract"]}</div>
+<div style="text-transform:uppercase;letter-spacing:0.04em;font-size:0.85rem;color:#64748b;font-weight:700;margin-bottom:6px;">Decision (Sau biến động)</div>
+<div style="font-size:1.9rem;font-weight:800;color:#0f172a;margin-bottom:8px;">{c_dec["continue_contract"]}</div>
 <div style="border-top:1px solid #e2e8f0;margin:8px 0;"></div>
-<div style="font-size:0.85rem;color:#334155;line-height:1.5;">{decision_summary_text}</div>
+<div style="font-size:1rem;color:#334155;line-height:1.6;">{decision_summary_text}</div>
 </div>
                 """, unsafe_allow_html=True)
 
-            st.caption(
+            st.markdown(
+                f'<div style="font-size:0.95rem;color:#64748b;line-height:1.6;margin:6px 0 4px 0;">'
                 f"ℹ️ Quyết định gốc trước biến động (thang đánh giá khác — "
-                f"ACCEPT/CONDITIONAL_ACCEPT/REJECT/NEED_MORE_DATA): **{baseline_dec['recommendation']}**. "
+                f"ACCEPT/CONDITIONAL_ACCEPT/REJECT/NEED_MORE_DATA): <strong>{baseline_dec['recommendation']}</strong>. "
                 "Không so sánh trực tiếp 1-1 với continue_contract ở trên vì đây là 2 thang đo khác nhau."
+                "</div>",
+                unsafe_allow_html=True,
             )
 
             st.warning(f"**Protection Condition:** {c_dec['key_protection_condition']}")
