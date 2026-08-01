@@ -1550,7 +1550,7 @@ def resolve_crisis_deltas(
         elif group == "DEADLINE_LATE":
             if crisis.days_deviation and crisis.days_deviation >= 7:
                 extra_oper += 0.005
-                extra_estimated_cost += list_price_goc * 0.015
+                extra_estimated_cost += estimated_cost * 0.015
                 notes.append(f"Giao muộn {crisis.days_deviation} ngày (>= 7 ngày): oper +0.5%, estimated cost +1.5% giá trị HĐ")
             elif crisis.days_deviation and crisis.days_deviation > 0:
                 extra_oper += 0.0005
