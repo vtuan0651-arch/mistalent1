@@ -346,7 +346,7 @@ def compute_scale_coefficient(num_provinces: Optional[int]) -> tuple[float, Opti
 
     * < 10 tỉnh thành: +0.01
     * 10 đến 20 tỉnh thành: +0.02
-    * > 20 tỉnh thành: +0.04   
+    * > 20 tỉnh thành: +0.05   
     """
     if num_provinces is None or num_provinces <= 0:
         return 0.0, None
@@ -358,7 +358,7 @@ def compute_scale_coefficient(num_provinces: Optional[int]) -> tuple[float, Opti
         he_so = 0.02
         mo_ta = f"10-20 tỉnh thành ({num_provinces})"
     else:
-        he_so = 0.04    
+        he_so = 0.05     
         mo_ta = f"> 20 tỉnh thành ({num_provinces})"
 
     return he_so, {"tieu_chi": f"Quy mô triển khai ({mo_ta})", "he_so": he_so}
