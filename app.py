@@ -1787,12 +1787,12 @@ Nhiệm vụ — trả về CrisisDecisionCardOutput gồm:
    nguyên giá trị Python đã cung cấp trong finance_metrics/cash_projection/
    requested_amount — không tự tính lại, không làm tròn khác đi (các trường này
    vẫn bị Python enforce lại sau, nhưng vẫn phải điền đúng ngay từ đầu).
-5. executive_summary: tóm tắt ngắn gọn bằng tiếng Việt về tác động của biến động
+5. executive_summary: tóm tắt ngắn gọn (4 dòng) bằng tiếng Việt về tác động của biến động
    này lên hợp đồng và lý do đưa ra continue_contract ở trên.
 6. Risk level phải đánh giá đúng tình hình tài chính BEFORE/AFTER:
     - Đánh giá dựa trên bảng risk rule: Nếu không vi phạm risk rule mới thì không thay đổi mức độ risk rule 
     - Không tự đặt risk_level trái với triggered_rules/risk_level đã có trong payload.
-7. Risk summary: cảnh báo điểm cần đặc biệt lưu ý dựa theo mức độ thay đổi của số liệu. 
+7. Risk summary: cảnh báo 1 điểm cần đặc biệt lưu ý dựa theo mức độ thay đổi của số liệu. Ngắn gọn trong 1 dòng. 
 Quy tắc bắt buộc:
 - Không phát minh số liệu, sản phẩm tín dụng hay điều khoản ngoài payload.
 - Không tự đổi requested_amount hay eligible của partner_matrix.
