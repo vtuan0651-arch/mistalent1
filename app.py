@@ -69,6 +69,15 @@ CASH_RESERVE_THRESHOLD_DEFAULT = 550_000_000.0  # RR-002 fallback nếu thiếu 
 LARGE_DECISION_THRESHOLD = 300_000_000.0  # RR-005 / ngưỡng Founder approval
 DEBT_CHECK_DATE = pd.Timestamp("2026-06-17")  # mốc kiểm tra hóa đơn Open quá hạn (Trường 2)
 
+# Order Change (PDF mục 2.2) — là 1 phần của Oper Score CƠ SỞ, dùng CHUNG cho cả
+# compute_order_change_coefficient() (baseline, khi tính hợp đồng ban đầu) lẫn
+# resolve_crisis_deltas() (Crisis Card), để không có 2 bộ ngưỡng lệch nhau.
+ORDER_CHANGE_FREE_LIMIT = 2  # <= 2 order/HĐ: miễn phí, không cộng Oper
+ORDER_CHANGE_SURCHARGE_OPER = 0.005  # > free limit và <= hard cap: +0.5% Oper
+# LƯU Ý: docx chỉ nói "có giới hạn mức trần order (khả năng của OPC)" nhưng KHÔNG
+# nêu con số cụ thể -> 10 là ngưỡng TẠM ĐẶT, cần Founder xác nhận lại.
+ORDER_CHANGE_HARD_CAP = 10
+
 
 
 # ============================================================
@@ -346,7 +355,7 @@ def compute_scale_coefficient(num_provinces: Optional[int]) -> tuple[float, Opti
 
     * < 10 tỉnh thành: +0.01
     * 10 đến 20 tỉnh thành: +0.02
-    * > 20 tỉnh thành: +0.05   
+    * > 20 tỉnh thành: +0.04   
     """
     if num_provinces is None or num_provinces <= 0:
         return 0.0, None
@@ -358,10 +367,60 @@ def compute_scale_coefficient(num_provinces: Optional[int]) -> tuple[float, Opti
         he_so = 0.02
         mo_ta = f"10-20 tỉnh thành ({num_provinces})"
     else:
-        he_so = 0.05     
+        he_so = 0.04    
         mo_ta = f"> 20 tỉnh thành ({num_provinces})"
 
     return he_so, {"tieu_chi": f"Quy mô triển khai ({mo_ta})", "he_so": he_so}
+
+
+def compute_order_change_coefficient(order_count: Optional[int]) -> tuple[float, Optional[dict], bool]:
+    """Hệ số Oper theo số lượng order (Order Change — PDF mục 2.2).
+
+    FIX: PDF liệt kê Order Change (giới hạn 2 order/HĐ) là 1 phần của Oper Score
+    CƠ SỞ, áp dụng ngay từ khi tính hợp đồng ban đầu — trước đây yếu tố này CHỈ
+    tồn tại trong nhánh Crisis Card (resolve_crisis_deltas), khiến hợp đồng gốc
+    không hề bị tính theo giới hạn order như PDF mô tả. Hàm này tách công thức ra
+    dùng CHUNG cho cả 2 nơi (một bộ ngưỡng duy nhất — ORDER_CHANGE_* ở đầu file):
+      * compute_oper_coefficient() / build_finance_metrics(): áp dụng khi Founder
+        CÓ nhập initial_order_count lúc tạo hợp đồng ban đầu (tham số optional,
+        mặc định None -> không có order nào -> không cộng Oper, giữ nguyên hành
+        vi cũ cho các hợp đồng không nhập trường này — "chỉ thêm vào Oper khi nào
+        được sử dụng/nhập thì mới áp dụng").
+      * resolve_crisis_deltas(): khi ORDER_CHANGE xảy ra giữa hợp đồng.
+
+    * <= 2 order: miễn phí, không cộng Oper.
+    * > 2 và <= 10 order: +0.5% Oper.
+    * > 10 order: vượt trần cứng -> KHÔNG cộng Oper ở đây (trả hard_cap_exceeded=True
+      để tầng gọi tự quyết định, giống cách resolve_crisis_deltas xử lý — không raise
+      Exception làm crash luồng).
+    """
+    if order_count is None or order_count <= 0:
+        return 0.0, None, False
+
+    if order_count > ORDER_CHANGE_HARD_CAP:
+        return (
+            0.0,
+            {
+                "tieu_chi": (
+                    f"Order Change VƯỢT TRẦN CỨNG ({ORDER_CHANGE_HARD_CAP} - ngưỡng tạm đặt, "
+                    f"cần Founder xác nhận lại con số này): {order_count} order"
+                ),
+                "he_so": 0.0,
+            },
+            True,
+        )
+
+    if order_count > ORDER_CHANGE_FREE_LIMIT:
+        return (
+            ORDER_CHANGE_SURCHARGE_OPER,
+            {
+                "tieu_chi": f"Order Change (vượt {ORDER_CHANGE_FREE_LIMIT} order, số order: {order_count})",
+                "he_so": ORDER_CHANGE_SURCHARGE_OPER,
+            },
+            False,
+        )
+
+    return 0.0, None, False
 
 
 def compute_oper_coefficient(
@@ -371,7 +430,8 @@ def compute_oper_coefficient(
     order_date: pd.Timestamp,
     due_date: pd.Timestamp,
     num_provinces: Optional[int] = None,
-) -> tuple[float, list[dict]]:
+    initial_order_count: Optional[int] = None,
+) -> tuple[float, list[dict], bool]:
     """Cộng dồn hệ số Oper theo bảng điều kiện của System Prompt.
 
     Ghi chú: Uy tín thanh toán (Payment Reliability) và Áp lực tiến độ giao hàng
@@ -379,6 +439,14 @@ def compute_oper_coefficient(
     +1.0%, luôn được cộng vào Oper bất kể payment_reliability / thời hạn hợp đồng.
 
     num_provinces: quy mô triển khai dự án (số tỉnh thành), nhập thủ công ở Input Data.
+    initial_order_count: số lượng order của hợp đồng ban đầu (PDF mục 2.2 — Order
+        Change, giới hạn 2 order/HĐ), nhập thủ công ở Input Data. Optional — mặc
+        định None (không nhập) thì không cộng thêm Oper, giữ nguyên hành vi/logic
+        đầu ra cũ cho các hợp đồng không dùng trường này.
+
+    Trả về (oper, breakdown, order_change_hard_cap_exceeded) — cờ thứ 3 báo hợp
+    đồng ban đầu đã vượt trần cứng số order ngay từ lúc tạo (xem
+    compute_order_change_coefficient).
     """
     oper = 0.0
     breakdown = []
@@ -400,7 +468,18 @@ def compute_oper_coefficient(
         oper += scale_he_so
         breakdown.append(scale_breakdown_item)
 
-    return oper, breakdown
+    # FIX: Order Change (PDF mục 2.2) — trước đây chỉ có trong Crisis Card, nay là
+    # 1 phần của Oper Score cơ sở, áp dụng ngay khi tính hợp đồng ban đầu (nếu có
+    # nhập initial_order_count). Xem compute_order_change_coefficient để biết chi
+    # tiết ngưỡng/lý do dùng chung công thức với resolve_crisis_deltas.
+    order_he_so, order_breakdown_item, order_hard_cap_exceeded = compute_order_change_coefficient(
+        initial_order_count
+    )
+    if order_breakdown_item is not None:
+        oper += order_he_so
+        breakdown.append(order_breakdown_item)
+
+    return oper, breakdown, order_hard_cap_exceeded
 
 
 def build_finance_metrics(
@@ -411,6 +490,7 @@ def build_finance_metrics(
     order_date: pd.Timestamp,
     due_date: pd.Timestamp,
     num_provinces: Optional[int] = None,
+    initial_order_count: Optional[int] = None,
 ) -> dict:
     """
     baseline_estimate = Σ (list_price × (1 - target_margin))
@@ -419,14 +499,18 @@ def build_finance_metrics(
 
     num_provinces: quy mô triển khai dự án (số tỉnh thành), nhập thủ công trên UI —
     được cộng thêm vào hệ số Oper theo compute_scale_coefficient().
+    initial_order_count: số lượng order của hợp đồng ban đầu (PDF mục 2.2 — Order
+    Change), nhập thủ công trên UI (optional) — được cộng thêm vào hệ số Oper theo
+    compute_order_change_coefficient().
     """
     total_list_price = float(selected_products["list_price"].sum())
     baseline_estimate = float(
         (selected_products["list_price"] * (1 - selected_products["target_margin"])).sum()
     )
 
-    oper, oper_breakdown = compute_oper_coefficient(
-        payment_reliability, province, transaction_risk_score, order_date, due_date, num_provinces
+    oper, oper_breakdown, order_change_hard_cap_exceeded = compute_oper_coefficient(
+        payment_reliability, province, transaction_risk_score, order_date, due_date,
+        num_provinces, initial_order_count,
     )
 
     estimated_cost = baseline_estimate * (1 + oper)
@@ -445,6 +529,8 @@ def build_finance_metrics(
         "estimated_cost": round(estimated_cost, 2),
         "gross_margin": round(gross_margin, 6),
         "contract_months": contract_months,
+        "initial_order_count": initial_order_count,
+        "order_change_hard_cap_exceeded": order_change_hard_cap_exceeded,
     }
 
 
@@ -1441,6 +1527,7 @@ def resolve_crisis_deltas(
     list_price_goc: float,
     old_num_provinces: Optional[int] = None,
     baseline_estimated_cost: Optional[float] = None,
+    old_order_count: Optional[int] = None,
 ) -> CrisisDelta:
     extra_oper = 0.0
     extra_estimated_cost = 0.0
@@ -1520,33 +1607,42 @@ def resolve_crisis_deltas(
                 f"net delta {net_scale_delta:+.2%})"
             )
         elif group == "ORDER_CHANGE":
-            ORDER_FREE_LIMIT = 2
-            ORDER_SURCHARGE_OPER = 0.005
-            # LƯU Ý: docx chỉ nói "có giới hạn mức trần order (khả năng của OPC)"
-            # nhưng KHÔNG nêu con số cụ thể -> 10 là ngưỡng TẠM ĐẶT, cần Founder
-            # xác nhận lại. Ngưỡng này được ghi rõ vào note/UI (thay vì raise
-            # Exception làm crash toàn bộ luồng xử lý Crisis Card) để Founder nhìn
-            # thấy và có thể chỉnh sửa nếu số này chưa đúng.
-            ORDER_HARD_CAP = 10
-            if crisis.new_order_count:
-                if crisis.new_order_count > ORDER_HARD_CAP:
-                    # FIX (bug nghiêm trọng): trước đây raise ValueError ở đây khiến
-                    # toàn bộ luồng Crisis Card bị except Exception chung ở UI bắt và
-                    # chỉ hiện "Lỗi hệ thống" -- không có Decision Card, không trả lời
-                    # được câu hỏi bắt buộc "có tiếp tục hợp đồng không / phương án
-                    # tài chính / điều kiện bảo vệ" theo đúng yêu cầu. Nay set cờ tất
-                    # định để tầng UI tự dựng 1 Decision Card TERMINATE rõ ràng.
-                    hard_cap_exceeded = True
-                    notes.append(
-                        f"Số order mới ({crisis.new_order_count}) VƯỢT TRẦN CỨNG "
-                        f"({ORDER_HARD_CAP} - ngưỡng tạm đặt, cần Founder xác nhận lại "
-                        "con số này) -> không thể tiếp tục theo điều kiện hiện tại."
+            # FIX: Order Change (PDF mục 2.2) giờ đã là 1 phần của Oper Score CƠ SỞ
+            # (xem compute_order_change_coefficient / build_finance_metrics), được
+            # tính ngay từ baseline nếu Founder có nhập initial_order_count lúc tạo
+            # hợp đồng. Để không cộng trùng hệ số Order Change 2 lần (giống cách
+            # SCOPE_CHANGE đang xử lý phần quy mô ở trên), Crisis Card chỉ cộng
+            # phần CHÊNH LỆCH (mới - cũ) so với hệ số đã có trong baseline.
+            old_order_he_so, _old_order_bd, _old_order_hard = compute_order_change_coefficient(
+                old_order_count
+            )
+            new_order_he_so, new_order_bd, new_order_hard_cap_exceeded = compute_order_change_coefficient(
+                crisis.new_order_count
+            )
+            if new_order_hard_cap_exceeded:
+                # FIX (bug nghiêm trọng): trước đây raise ValueError ở đây khiến
+                # toàn bộ luồng Crisis Card bị except Exception chung ở UI bắt và
+                # chỉ hiện "Lỗi hệ thống" -- không có Decision Card, không trả lời
+                # được câu hỏi bắt buộc "có tiếp tục hợp đồng không / phương án
+                # tài chính / điều kiện bảo vệ" theo đúng yêu cầu. Nay set cờ tất
+                # định để tầng UI tự dựng 1 Decision Card TERMINATE rõ ràng.
+                hard_cap_exceeded = True
+                notes.append(
+                    f"Số order mới ({crisis.new_order_count}) VƯỢT TRẦN CỨNG "
+                    f"({ORDER_CHANGE_HARD_CAP} - ngưỡng tạm đặt, cần Founder xác nhận lại "
+                    "con số này) -> không thể tiếp tục theo điều kiện hiện tại."
+                )
+            elif crisis.new_order_count:
+                net_order_delta = new_order_he_so - old_order_he_so
+                extra_oper += net_order_delta
+                notes.append(
+                    (
+                        new_order_bd["tieu_chi"]
+                        if new_order_bd
+                        else f"Số order mới: {crisis.new_order_count} (trong hạn mức miễn phí)"
                     )
-                elif crisis.new_order_count > ORDER_FREE_LIMIT:
-                    extra_oper += ORDER_SURCHARGE_OPER
-                    notes.append(f"Vượt {ORDER_FREE_LIMIT} order (số order: {crisis.new_order_count}): oper +{ORDER_SURCHARGE_OPER}")
-                else:
-                    notes.append(f"Số order mới: {crisis.new_order_count} (trong hạn mức miễn phí)")
+                    + f" (net delta so với baseline: {net_order_delta:+.2%})"
+                )
             else:
                 notes.append("Số order không đổi")
         elif group == "FINANCE_CONDITION":
@@ -1594,11 +1690,12 @@ def build_finance_metrics_with_crisis(
     order_date: pd.Timestamp,
     due_date: pd.Timestamp,
     num_provinces: Optional[int],
-    crisis_delta: CrisisDelta
+    crisis_delta: CrisisDelta,
+    initial_order_count: Optional[int] = None,
 ) -> dict:
     metrics = build_finance_metrics(
-        selected_products, payment_reliability, province, 
-        transaction_risk_score, order_date, due_date, num_provinces
+        selected_products, payment_reliability, province,
+        transaction_risk_score, order_date, due_date, num_provinces, initial_order_count,
     )
     if crisis_delta:
         metrics["oper_coefficient"] += crisis_delta.extra_oper
@@ -2798,6 +2895,21 @@ trước khi ra Decision Card.
                     "thêm: < 10 tỉnh thành → +0.01; 10-20 tỉnh thành → +0.02; > 20 tỉnh thành → +0.04.",
                 )
 
+                # FIX: Order Change (PDF mục 2.2) là 1 phần của Oper Score cơ sở, không
+                # chỉ Crisis Card. Trường này để TRỐNG (0) nếu hợp đồng chưa xác định
+                # trước số order -> không cộng thêm Oper, giữ nguyên hành vi cũ.
+                initial_order_count = st.number_input(
+                    "Số lượng order ban đầu của hợp đồng (nếu có)",
+                    min_value=0,
+                    value=0,
+                    step=1,
+                    help="Chỉ nhập nếu hợp đồng đã xác định trước số lượng order. Hệ số Oper sẽ "
+                    f"được cộng thêm nếu vượt {ORDER_CHANGE_FREE_LIMIT} order/HĐ: "
+                    f"> {ORDER_CHANGE_FREE_LIMIT} và ≤ {ORDER_CHANGE_HARD_CAP} order → "
+                    f"+{ORDER_CHANGE_SURCHARGE_OPER:.1%}; > {ORDER_CHANGE_HARD_CAP} order → vượt trần cứng "
+                    "(ngưỡng tạm đặt, cần Founder xác nhận lại).",
+                )
+
                 selected_services = st.multiselect(
                     "Danh sách dịch vụ (service_name) theo yêu cầu khách hàng",
                     service_names,
@@ -2865,7 +2977,19 @@ trước khi ra Decision Card.
                             order_date=order_date,
                             due_date=due_date,
                             num_provinces=int(num_provinces) if num_provinces else None,
+                            initial_order_count=int(initial_order_count) if initial_order_count else None,
                         )
+
+                        if finance_metrics.get("order_change_hard_cap_exceeded"):
+                            # Hợp đồng ban đầu đã vượt trần cứng Order Change ngay từ lúc tạo
+                            # -> cảnh báo rõ cho Founder (không chặn tính toán, để Founder vẫn
+                            # thấy đầy đủ Decision Card và tự quyết định, giống cách UI xử lý
+                            # missing_fields).
+                            st.warning(
+                                f"⚠️ Số lượng order ban đầu ({int(initial_order_count)}) vượt trần cứng "
+                                f"Order Change ({ORDER_CHANGE_HARD_CAP} - ngưỡng tạm đặt, cần Founder "
+                                "xác nhận lại con số này)."
+                            )
 
                         reserve_minimum = float(
                             profile.get("cash_reserve_minimum", CASH_RESERVE_THRESHOLD_DEFAULT)
@@ -2935,6 +3059,7 @@ trước khi ra Decision Card.
                                     "selected_services": selected_services,
                                     "order_date": str(order_date.date()),
                                     "due_date": str(due_date.date()),
+                                    "initial_order_count": int(initial_order_count) if initial_order_count else None,
                                 },
                                 "finance_metrics": finance_metrics,
                                 "cash_projection": cash_projection,
@@ -3086,11 +3211,22 @@ trước khi ra Decision Card.
                                 "customer_type": customer_type,
                                 "province": province,
                                 "existing_customer": existing_customer,
+                                # FIX (bug có sẵn): trước đây key này không tồn tại trong
+                                # "customer", nên mọi lần resolve_crisis_deltas() gọi
+                                # result["customer"].get("num_provinces") để lấy
+                                # old_num_provinces đều nhận về None -> cơ chế chống cộng
+                                # trùng hệ số quy mô của SCOPE_CHANGE (net_scale_delta =
+                                # new_scale - old_scale) không bao giờ hoạt động thực tế,
+                                # luôn cộng thẳng hệ số quy mô MỚI lên baseline (đã có sẵn
+                                # hệ số quy mô CŨ) -> bị tính trùng. Lưu lại num_provinces
+                                # gốc tại đây để Crisis Card đọc đúng giá trị cũ.
+                                "num_provinces": int(num_provinces) if num_provinces else None,
                             },
                             "opportunity": {
                                 "selected_services": selected_services,
                                 "order_date": str(order_date.date()),
                                 "due_date": str(due_date.date()),
+                                "initial_order_count": int(initial_order_count) if initial_order_count else None,
                             },
                             "finance_metrics": finance_metrics,
                             "cash_projection": cash_projection,
@@ -3599,6 +3735,7 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                             list_price_goc,
                             result["customer"].get("num_provinces"),
                             baseline_metrics.get("estimated_cost"),
+                            result["opportunity"].get("initial_order_count"),
                         )
 
                         # FIX (bug nghiêm trọng): trước đây vượt trần cứng ORDER_CHANGE làm
@@ -3651,7 +3788,8 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                                 pd.to_datetime(result["opportunity"]["order_date"]),
                                 pd.to_datetime(result["opportunity"]["due_date"]),
                                 result["customer"].get("num_provinces"),
-                                delta
+                                delta,
+                                result["opportunity"].get("initial_order_count"),
                             )
 
                             reserve_minimum = float(result["profile"].get("cash_reserve_minimum", CASH_RESERVE_THRESHOLD_DEFAULT) or CASH_RESERVE_THRESHOLD_DEFAULT)
