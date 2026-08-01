@@ -1418,9 +1418,6 @@ class CrisisDecisionCardOutput(BaseModel):
     funding_amount_after: float
     executive_summary: str
 
-CRISIS_RISK_LEVEL_ORDER = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
-
-
 def derive_risk_level_from_triggered_rules(triggered_rules: list[dict]) -> str:
     severities = {
         str(rule.get("severity", "")).strip().upper()
@@ -1434,45 +1431,6 @@ def derive_risk_level_from_triggered_rules(triggered_rules: list[dict]) -> str:
         return "MEDIUM"
     return "LOW"
 
-def adjust_crisis_risk_level_by_financial_delta(
-    base_risk_level: str,
-    before_min_closing_cash: float,
-    after_min_closing_cash: float,
-    before_requested_amount: float,
-    after_requested_amount: float,
-    triggered_rules: list[dict],
-) -> str:
-    """Điều chỉnh risk level theo biến động tài chính trong Crisis.
-
-    Rule:
-    - Nếu closing cash tăng VÀ nhu cầu vay giảm -> hạ 1 mức risk (trừ khi còn Critical).
-    - Nếu closing cash giảm VÀ nhu cầu vay tăng -> nâng 1 mức risk.
-    - Các trường hợp còn lại giữ nguyên base_risk_level.
-    """
-    normalized_base = str(base_risk_level or "LOW").strip().upper()
-    if normalized_base not in CRISIS_RISK_LEVEL_ORDER:
-        normalized_base = derive_risk_level_from_triggered_rules(triggered_rules)
-
-    epsilon = 1e-6
-    improved_cash = (after_min_closing_cash - before_min_closing_cash) > epsilon
-    reduced_funding_need = (before_requested_amount - after_requested_amount) > epsilon
-    worsened_cash = (before_min_closing_cash - after_min_closing_cash) > epsilon
-    increased_funding_need = (after_requested_amount - before_requested_amount) > epsilon
-
-    severities = {
-        str(rule.get("severity", "")).strip().upper()
-        for rule in (triggered_rules or [])
-    }
-    has_critical = "CRITICAL" in severities
-    level_index = CRISIS_RISK_LEVEL_ORDER.index(normalized_base)
-
-    if improved_cash and reduced_funding_need and not has_critical:
-        return CRISIS_RISK_LEVEL_ORDER[max(0, level_index - 1)]
-
-    if worsened_cash and increased_funding_need:
-        return CRISIS_RISK_LEVEL_ORDER[min(len(CRISIS_RISK_LEVEL_ORDER) - 1, level_index + 1)]
-
-    return normalized_base
 def resolve_crisis_deltas(
     crisis: CrisisCardInput,
     list_price_goc: float,
@@ -3753,14 +3711,11 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                                 result.get("cash_projection", {}).get("min_projected_closing_cash", 0.0) or 0.0
                             )
                             before_requested_amount_for_risk = float(result.get("requested_amount", 0.0) or 0.0)
-                            risk_level_after = adjust_crisis_risk_level_by_financial_delta(
-                                base_risk_level_after,
-                                before_cash_for_risk,
-                                float(cp_after.get("min_projected_closing_cash", 0.0) or 0.0),
-                                before_requested_amount_for_risk,
-                                float(requested_amount_after or 0.0),
-                                triggered_after,
-                            )
+                            # Đánh giá risk level sau biến động chỉ dựa thuần vào mức vi phạm
+                            # risk rule (triggered_after) — giống cách evaluate_risk_rules() đánh
+                            # giá risk_level ở luồng baseline — không còn nâng/hạ mức risk theo
+                            # biến động dòng tiền/nhu cầu vay như trước.
+                            risk_level_after = base_risk_level_after
 
                             risk_payload_after = {
                                 "finance_agent_output": f_res_after.model_dump() if f_res_after else {},
