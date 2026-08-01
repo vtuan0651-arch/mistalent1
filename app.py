@@ -1771,7 +1771,7 @@ Nhiệm vụ — trả về CrisisDecisionCardOutput gồm:
    - CONTINUE WITH CONDITIONS: hợp đồng còn khả thi nhưng cần thêm điều kiện ràng
      buộc/kiểm soát (VD: gross_margin giảm nhưng vẫn dương, cần huy động vốn ngoài,
      cần đàm phán lại một phần điều khoản với khách hàng).
-   - TERMINATE: closing_cash sau biến động < 0 VÀ partner_matrix không có sản phẩm
+   - TERMINATE: closing_cash sau biến động < 0, gross_margin < 15% VÀ partner_matrix không có sản phẩm
      nào eligible=true (không còn nguồn bù đắp) — trong trường hợp này BẮT BUỘC
      chọn TERMINATE, không được chọn giá trị khác.
 2. financing_plan: nêu rõ phương án tài chính cụ thể áp dụng (vay gói nào trong
@@ -1792,6 +1792,7 @@ Nhiệm vụ — trả về CrisisDecisionCardOutput gồm:
 6. Risk level phải đánh giá đúng tình hình tài chính BEFORE/AFTER:
     - Đánh giá dựa trên bảng risk rule: Nếu không vi phạm risk rule mới thì không thay đổi mức độ risk rule 
     - Không tự đặt risk_level trái với triggered_rules/risk_level đã có trong payload.
+7. Risk summary: cảnh báo điểm cần đặc biệt lưu ý dựa theo mức độ thay đổi của số liệu. 
 Quy tắc bắt buộc:
 - Không phát minh số liệu, sản phẩm tín dụng hay điều khoản ngoài payload.
 - Không tự đổi requested_amount hay eligible của partner_matrix.
@@ -3827,7 +3828,7 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                 # NEED_MORE_DATA) là 2 thang nhãn KHÁC HỆ THỐNG — trước đây đặt cạnh nhau
                 # dưới dạng "delta" của cùng 1 metric khiến người xem dễ hiểu nhầm là cùng
                 # một thang đo. Nay tách rõ 2 dòng thông tin, không dùng delta cho cặp này.
-                st.metric("Decision (Sau biến động)", c_dec["continue_contract"])
+                st.metric("Recommend Decision", c_dec["continue_contract"])
                 st.caption(f"📝 **Decision Summary:** {c_dec['executive_summary']}")
 
             st.caption(
