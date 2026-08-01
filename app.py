@@ -1993,7 +1993,7 @@ st.markdown(
 <style>
 /* Import font hiện đại — Outfit cho nội dung, Inter cho tiêu đề/nhãn (đã được
    dùng ở nhiều nơi trong app nhưng trước đây chưa được import). */
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@300;400;500;600;700&display=swap');
 
 :root {
     --brand-blue: #2563eb;
