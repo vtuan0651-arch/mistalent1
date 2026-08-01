@@ -1353,6 +1353,10 @@ class CrisisCardInput(BaseModel):
     contract_id: str
     days_deviation: Optional[int] = None
     extra_cost_amount: Optional[float] = None
+    # Cách nhập thay thế cho extra_cost_amount: chi phí phát sinh theo % trên
+    # estimated_cost baseline (dương = tăng chi phí, âm = giảm chi phí). Nếu cả
+    # 2 trường cùng được điền, ưu tiên extra_cost_percent (xem resolve_crisis_deltas).
+    extra_cost_percent: Optional[float] = None
     late_amount: Optional[float] = None
     late_month: Optional[str] = None
     late_days: Optional[int] = None
@@ -1375,8 +1379,8 @@ def validate_crisis_card_input(crisis: CrisisCardInput) -> list[str]:
         errors.append("Không thể chọn đồng thời Giao sớm và Giao muộn cho cùng một biến động (mâu thuẫn về tiến độ).")
     if any(g in ["DEADLINE_EARLY", "DEADLINE_LATE"] for g in crisis.crisis_group) and not crisis.days_deviation:
         errors.append("Cần nhập số ngày sớm/muộn cho biến động tiến độ.")
-    if "COST_CHANGE" in crisis.crisis_group and not crisis.extra_cost_amount:
-        errors.append("Cần nhập chi phí phát sinh.")
+    if "COST_CHANGE" in crisis.crisis_group and not crisis.extra_cost_amount and not crisis.extra_cost_percent:
+        errors.append("Cần nhập chi phí phát sinh (theo số tiền VNĐ hoặc theo %).")
     # FIX (theo yêu cầu bổ sung): late_month giờ là tùy chọn — nếu Founder không
     # nhập tháng cụ thể, hệ thống tự áp dụng vào tháng ĐẦU của lịch dòng tiền hợp
     # đồng (xem project_closing_cash_with_crisis). Chỉ còn late_amount và
@@ -1469,7 +1473,12 @@ def adjust_crisis_risk_level_by_financial_delta(
         return CRISIS_RISK_LEVEL_ORDER[min(len(CRISIS_RISK_LEVEL_ORDER) - 1, level_index + 1)]
 
     return normalized_base
-def resolve_crisis_deltas(crisis: CrisisCardInput, list_price_goc: float, old_num_provinces: Optional[int] = None) -> CrisisDelta:
+def resolve_crisis_deltas(
+    crisis: CrisisCardInput,
+    list_price_goc: float,
+    old_num_provinces: Optional[int] = None,
+    baseline_estimated_cost: Optional[float] = None,
+) -> CrisisDelta:
     extra_oper = 0.0
     extra_estimated_cost = 0.0
     extra_list_price = 0.0
@@ -1498,8 +1507,18 @@ def resolve_crisis_deltas(crisis: CrisisCardInput, list_price_goc: float, old_nu
                 extra_estimated_cost += list_price_goc * 0.01
                 notes.append(f"Giao muộn {crisis.days_deviation} ngày (<7 ngày): oper +0.05%, estimated cost +1% giá trị HĐ")
         elif group == "COST_CHANGE":
-            extra_estimated_cost += crisis.extra_cost_amount or 0.0
-            notes.append(f"Phát sinh chi phí: +{crisis.extra_cost_amount or 0.0} VNĐ")
+            if crisis.extra_cost_percent is not None:
+                base_cost_for_percent = baseline_estimated_cost or 0.0
+                percent_based_cost = base_cost_for_percent * (crisis.extra_cost_percent / 100.0)
+                extra_estimated_cost += percent_based_cost
+                notes.append(
+                    f"Phát sinh chi phí theo tỷ lệ: {crisis.extra_cost_percent:+.2f}% trên "
+                    f"estimated_cost baseline ({base_cost_for_percent:,.0f} VNĐ) "
+                    f"= {percent_based_cost:+,.0f} VNĐ"
+                )
+            else:
+                extra_estimated_cost += crisis.extra_cost_amount or 0.0
+                notes.append(f"Phát sinh chi phí: +{crisis.extra_cost_amount or 0.0} VNĐ")
         elif group == "PAYMENT_DELAY":
             if crisis.late_amount and crisis.late_days:
                 # Lãi kép 1%/ngày trên số tiền chậm trả (đúng docx mục 3):
@@ -1813,7 +1832,7 @@ Nhiệm vụ — trả về CrisisDecisionCardOutput gồm:
 5. executive_summary: tóm tắt ngắn gọn bằng tiếng Việt về tác động của biến động
    này lên hợp đồng và lý do đưa ra continue_contract ở trên.
 6. Risk level phải đánh giá đúng tình hình tài chính BEFORE/AFTER:
-    - Đánh giá dựa vào risk rule vi phạm ở trên. Nếu không vi phạm thêm risk rule nào thì không được thay đổi.  
+    - Đánh giá dựa trên bảng risk rule: Nếu không vi phạm risk rule mới thì không thay đổi mức độ risk rule 
     - Không tự đặt risk_level trái với triggered_rules/risk_level đã có trong payload.
 Quy tắc bắt buộc:
 - Không phát minh số liệu, sản phẩm tín dụng hay điều khoản ngoài payload.
@@ -1849,6 +1868,7 @@ class CrisisCardPromptExtraction(BaseModel):
     ]] = Field(max_length=2)
     days_deviation: Optional[int] = None
     extra_cost_amount: Optional[float] = None
+    extra_cost_percent: Optional[float] = None
     late_amount: Optional[float] = None
     late_month: Optional[str] = None
     late_days: Optional[int] = None
@@ -1880,7 +1900,11 @@ những trường thực sự được đề cập, để trống (null) các tr
   FINANCE_CONDITION (đổi lãi suất/phí xử lý/tỷ lệ thế chấp),
   SCOPE_CHANGE (đổi số tỉnh/thành triển khai), ORDER_CHANGE (đổi số lượng đơn hàng).
 - days_deviation: số ngày sớm/muộn (dùng cho DEADLINE_EARLY/DEADLINE_LATE).
-- extra_cost_amount: số tiền chi phí phát sinh (VNĐ, dùng cho COST_CHANGE).
+- extra_cost_amount: số tiền chi phí phát sinh (VNĐ, dùng cho COST_CHANGE, khi mô tả
+  nêu con số tuyệt đối).
+- extra_cost_percent: % chi phí phát sinh trên estimated_cost baseline (dùng cho
+  COST_CHANGE, khi mô tả nêu theo tỷ lệ %, dương = tăng, âm = giảm). Chỉ điền MỘT
+  trong hai trường extra_cost_amount / extra_cost_percent theo đúng cách mô tả nêu ra.
 - late_amount, late_month ("YYYY-MM"), late_days: dùng cho PAYMENT_DELAY.
 - new_annual_rate_or_fee, new_processing_fee_rate, new_collateral_ratio: dùng cho
   FINANCE_CONDITION (chỉ điền trường được đề cập rõ ràng, kể cả khi giá trị mới = 0).
@@ -3476,7 +3500,23 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                 crisis_group = st.multiselect("Nhóm biến động (crisis_group)", list(CRISIS_GROUP_LABELS.keys()), format_func=lambda key: CRISIS_GROUP_LABELS[key], max_selections=2, key="cc_crisis_group")
 
                 days_deviation_input = st.number_input("Số ngày sớm/muộn", min_value=0, value=0, step=1, key="cc_days_deviation")
-                extra_cost_amount_input = st.number_input("Chi phí phát sinh (VNĐ)", min_value=0.0, value=0.0, step=1_000_000.0, key="cc_extra_cost_amount")
+
+                extra_cost_mode = st.radio(
+                    "Cách nhập chi phí phát sinh (COST_CHANGE)",
+                    ["Theo số tiền (VNĐ)", "Theo phần trăm (%)"],
+                    horizontal=True,
+                    key="cc_extra_cost_mode",
+                )
+                if extra_cost_mode == "Theo số tiền (VNĐ)":
+                    extra_cost_amount_input = st.number_input("Chi phí phát sinh (VNĐ)", min_value=0.0, value=0.0, step=1_000_000.0, key="cc_extra_cost_amount")
+                    extra_cost_percent_input = 0.0
+                else:
+                    extra_cost_amount_input = 0.0
+                    extra_cost_percent_input = st.number_input(
+                        "Chi phí phát sinh (% trên estimated_cost baseline, âm = giảm chi phí)",
+                        min_value=-100.0, value=0.0, step=0.5, format="%.2f",
+                        key="cc_extra_cost_percent",
+                    )
                 late_amount_input = st.number_input("Số tiền khách hàng trả muộn (VNĐ)", min_value=0.0, value=default_late_amount, step=1_000_000.0, key="cc_late_amount")
                 late_month_input = st.text_input(
                     "Tháng bị trả muộn (VD: 2026-07) — để trống = tự động áp dụng vào tháng ĐẦU của hợp đồng",
@@ -3514,6 +3554,7 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                         contract_id=running_contract_id,
                         days_deviation=int(days_deviation_input) if days_deviation_input else None,
                         extra_cost_amount=float(extra_cost_amount_input) if extra_cost_amount_input else None,
+                        extra_cost_percent=float(extra_cost_percent_input) if extra_cost_percent_input else None,
                         late_amount=float(late_amount_input) if late_amount_input else None,
                         late_month=late_month_input.strip() if late_month_input else None,
                         late_days=int(late_days_input) if late_days_input else None,
@@ -3552,6 +3593,7 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                                 contract_id=running_contract_id,
                                 days_deviation=extraction.days_deviation,
                                 extra_cost_amount=extraction.extra_cost_amount,
+                                extra_cost_percent=extraction.extra_cost_percent,
                                 late_amount=extraction.late_amount,
                                 late_month=extraction.late_month,
                                 late_days=extraction.late_days,
@@ -3581,7 +3623,12 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                         baseline_metrics = result["finance_metrics"]
                         list_price_goc = baseline_metrics["total_list_price"]
 
-                        delta = resolve_crisis_deltas(crisis_obj, list_price_goc, result["customer"].get("num_provinces"))
+                        delta = resolve_crisis_deltas(
+                            crisis_obj,
+                            list_price_goc,
+                            result["customer"].get("num_provinces"),
+                            baseline_metrics.get("estimated_cost"),
+                        )
 
                         # FIX (bug nghiêm trọng): trước đây vượt trần cứng ORDER_CHANGE làm
                         # resolve_crisis_deltas() raise Exception -> crash cả luồng, không có
