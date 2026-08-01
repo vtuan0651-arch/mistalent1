@@ -1032,6 +1032,11 @@ Quy tắc bắt buộc:
 - risk_level phải khớp với risk_level đã được Python tính (dùng lại nguyên giá trị). Đưa ra tất cả các giá trị risk level đang xuất hiện.  
 - Nếu missing_fields không rỗng, phải nêu yêu cầu bổ sung dữ liệu.
 - Viết bằng tiếng Việt, ngắn gọn và có thể hành động.
+- warnings: mỗi cảnh báo chỉ 1 câu ngắn (tối đa ~25 từ), nêu đúng 1 ý chính (rule
+  nào bị vi phạm + hậu quả/rủi ro chính), KHÔNG liệt kê đầy đủ số liệu/evidence chi
+  tiết trong câu này (evidence chi tiết đã có sẵn trong triggered_rules). Ưu tiên
+  chất lượng — chỉ giữ lại cảnh báo quan trọng nhất, không cần liệt kê hết mọi khía
+  cạnh.
 """
     return call_structured_agent(client, model, instructions, payload, RiskAgentOutput, "Risk & Compliance Agent")
 
@@ -1771,7 +1776,7 @@ Nhiệm vụ — trả về CrisisDecisionCardOutput gồm:
    - CONTINUE WITH CONDITIONS: hợp đồng còn khả thi nhưng cần thêm điều kiện ràng
      buộc/kiểm soát (VD: gross_margin giảm nhưng vẫn dương, cần huy động vốn ngoài,
      cần đàm phán lại một phần điều khoản với khách hàng).
-   - TERMINATE: closing_cash sau biến động < 0, gross_margin < 15% VÀ partner_matrix không có sản phẩm
+   - TERMINATE: closing_cash sau biến động < 0 VÀ partner_matrix không có sản phẩm
      nào eligible=true (không còn nguồn bù đắp) — trong trường hợp này BẮT BUỘC
      chọn TERMINATE, không được chọn giá trị khác.
 2. financing_plan: nêu rõ phương án tài chính cụ thể áp dụng (vay gói nào trong
@@ -1787,12 +1792,14 @@ Nhiệm vụ — trả về CrisisDecisionCardOutput gồm:
    nguyên giá trị Python đã cung cấp trong finance_metrics/cash_projection/
    requested_amount — không tự tính lại, không làm tròn khác đi (các trường này
    vẫn bị Python enforce lại sau, nhưng vẫn phải điền đúng ngay từ đầu).
-5. executive_summary: tóm tắt ngắn gọn (4 dòng) bằng tiếng Việt về tác động của biến động
-   này lên hợp đồng và lý do đưa ra continue_contract ở trên.
+5. executive_summary: tóm tắt ngắn gọn bằng tiếng Việt về tác động của biến động
+   này lên hợp đồng và lý do đưa ra continue_contract ở trên. Tối đa 2-3 câu, chỉ
+   nêu ĐÚNG 1 nguyên nhân/tác động chính + 1 căn cứ cho quyết định — KHÔNG liệt kê
+   lại toàn bộ số liệu chi tiết (các số liệu đó đã hiển thị riêng ở finance_metrics/
+   cash_projection), ưu tiên diễn giải ngắn, dễ hiểu, đi thẳng vào ý chính.
 6. Risk level phải đánh giá đúng tình hình tài chính BEFORE/AFTER:
     - Đánh giá dựa trên bảng risk rule: Nếu không vi phạm risk rule mới thì không thay đổi mức độ risk rule 
     - Không tự đặt risk_level trái với triggered_rules/risk_level đã có trong payload.
-7. Risk summary: (tối đa 2 dòng)cảnh báo 1 điểm cần đặc biệt lưu ý dựa theo mức độ thay đổi của số liệu.  
 Quy tắc bắt buộc:
 - Không phát minh số liệu, sản phẩm tín dụng hay điều khoản ngoài payload.
 - Không tự đổi requested_amount hay eligible của partner_matrix.
@@ -3810,17 +3817,31 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
             row1_col2.metric("Closing Cash", format_vnd_safe(a_cash), format_vnd_safe(a_cash - b_cash))
             row1_col3.metric("Funding Amount", format_vnd_safe(a_funding), format_vnd_safe(a_funding - b_funding))
 
-            # Dòng 2: Risk Level (kèm risk summary do AI đề xuất) và Decision (kèm decision summary)
+            # Dòng 2: Risk Level (kèm risk summary do AI đề xuất) và Decision (kèm decision summary) —
+            # gộp chung vào 1 khối thẻ (card) duy nhất cho mỗi bên, thay vì tách metric/caption rời nhau.
+            risk_agent_output_after = c_res.get("risk_agent_output")
+            if risk_agent_output_after and risk_agent_output_after.get("warnings"):
+                risk_summary_text = "🤖 <strong>Risk Summary (AI):</strong> " + " | ".join(risk_agent_output_after["warnings"])
+            elif risk_agent_output_after and risk_agent_output_after.get("recommended_controls"):
+                risk_summary_text = "🤖 <strong>Risk Summary (AI):</strong> " + " | ".join(risk_agent_output_after["recommended_controls"])
+            else:
+                risk_summary_text = "<em>Không có risk summary từ AI cho biến động này (vượt trần cứng, không qua Risk Agent).</em>"
+
+            risk_color = "#ef4444" if a_risk in ["CRITICAL", "HIGH"] else "#eab308" if a_risk == "MEDIUM" else "#22c55e"
+
+            decision_summary_text = f"📝 <strong>Decision Summary:</strong> {c_dec['executive_summary']}"
+
             row2_col1, row2_col2 = st.columns(2)
             with row2_col1:
-                st.metric("Risk Level", a_risk, "Old: " + b_risk)
-                risk_agent_output_after = c_res.get("risk_agent_output")
-                if risk_agent_output_after and risk_agent_output_after.get("warnings"):
-                    st.caption("🤖 **Risk Summary (AI):** " + " | ".join(risk_agent_output_after["warnings"]))
-                elif risk_agent_output_after and risk_agent_output_after.get("recommended_controls"):
-                    st.caption("🤖 **Risk Summary (AI):** " + " | ".join(risk_agent_output_after["recommended_controls"]))
-                else:
-                    st.caption("_Không có risk summary từ AI cho biến động này (vượt trần cứng, không qua Risk Agent)._")
+                st.markdown(f"""
+<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:16px 20px;box-shadow:0 4px 16px rgba(15,23,42,0.04);height:100%;">
+<div style="text-transform:uppercase;letter-spacing:0.04em;font-size:0.76rem;color:#64748b;font-weight:700;margin-bottom:4px;">Risk Level</div>
+<div style="font-size:1.5rem;font-weight:800;color:{risk_color};margin-bottom:6px;">{a_risk}</div>
+<div style="display:inline-block;background:#f1f5f9;color:#64748b;font-size:0.78rem;font-weight:600;padding:2px 10px;border-radius:8px;margin-bottom:10px;">Old: {b_risk}</div>
+<div style="border-top:1px solid #e2e8f0;margin:8px 0;"></div>
+<div style="font-size:0.85rem;color:#334155;line-height:1.5;">{risk_summary_text}</div>
+</div>
+                """, unsafe_allow_html=True)
 
             with row2_col2:
                 # FIX (gây nhầm lẫn): continue_contract (CONTINUE/CONTINUE WITH CONDITIONS/
@@ -3828,8 +3849,14 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                 # NEED_MORE_DATA) là 2 thang nhãn KHÁC HỆ THỐNG — trước đây đặt cạnh nhau
                 # dưới dạng "delta" của cùng 1 metric khiến người xem dễ hiểu nhầm là cùng
                 # một thang đo. Nay tách rõ 2 dòng thông tin, không dùng delta cho cặp này.
-                st.metric("Recommend Decision", c_dec["continue_contract"])
-                st.caption(f"📝 **Decision Summary:** {c_dec['executive_summary']}")
+                st.markdown(f"""
+<div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:16px 20px;box-shadow:0 4px 16px rgba(15,23,42,0.04);height:100%;">
+<div style="text-transform:uppercase;letter-spacing:0.04em;font-size:0.76rem;color:#64748b;font-weight:700;margin-bottom:4px;">Decision (Sau biến động)</div>
+<div style="font-size:1.5rem;font-weight:800;color:#0f172a;margin-bottom:6px;">{c_dec["continue_contract"]}</div>
+<div style="border-top:1px solid #e2e8f0;margin:8px 0;"></div>
+<div style="font-size:0.85rem;color:#334155;line-height:1.5;">{decision_summary_text}</div>
+</div>
+                """, unsafe_allow_html=True)
 
             st.caption(
                 f"ℹ️ Quyết định gốc trước biến động (thang đánh giá khác — "
