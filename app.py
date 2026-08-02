@@ -3332,7 +3332,7 @@ trước khi ra Decision Card.
                                     "timestamp": time.strftime("%H:%M:%S %d/%m/%Y"),
                                 }
                             )
-                            # [BỔ SUNG] Sau khi đã xác định gói vay bảo lãnh phù hợp
+                            # [BỔ SUNG] Sau khi đã xác định gói bảo lãnh phù hợp
                             # (guarantee_loan_option, từ build_guarantee_partner_matrix ở trên),
                             # nếu guarantee_amount > 300 triệu (RR-005) thì gọi AI sinh cảnh báo
                             # cần Founder phê duyệt riêng cho khoản vay bảo lãnh này. Cảnh báo
@@ -4451,7 +4451,7 @@ và khuyến nghị quyết định dành cho Founder.
 <div class="dash-container" style="background: white; border-radius: 16px; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 16px;">
 <div style="font-size: 0.85rem; color: #64748b;">Tỷ lệ bảo lãnh: <strong>{guarantee_result['guarantee_percent']:.1f}%</strong> · Giá trị hợp đồng Project: <strong>{format_vnd(guarantee_result['project_contract_value'])}</strong></div>
 <div style="font-size: 1.15rem; color: #0f172a; font-weight: 700; margin-top: 10px;">Khoản bảo lãnh cần huy động: {format_vnd(guarantee_result['guarantee_amount'])}</div>
-<div style="font-size: 0.9rem; color: #334155; margin-top: 10px;">Gói vay bảo lãnh phù hợp: <strong>{g_loan_html}</strong></div>
+<div style="font-size: 0.9rem; color: #334155; margin-top: 10px;">Gói bảo lãnh phù hợp: <strong>{g_loan_html}</strong></div>
 </div>
                 """, unsafe_allow_html=True)
 
