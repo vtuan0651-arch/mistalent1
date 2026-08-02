@@ -2724,7 +2724,7 @@ with st.sidebar:
     api_key = api_key_input.strip() or OPENAI_API_KEY_HARDCODED.strip() or env_key
     model = st.text_input(
         "Model",
-        value="gpt-4.1",
+        value="gpt-5-mini",
         key="model_input_v4",
         help="Model OpenAI hỗ trợ Structured Outputs, ví dụ: gpt-5, gpt-5-mini,gpt-4o-mini, gpt-4o, gpt-4.1, gpt-4.1-mini.",
     )
@@ -4422,6 +4422,45 @@ và khuyến nghị quyết định dành cho Founder.
 </div>
                 """, unsafe_allow_html=True)
 
+            # [BỔ SUNG] Hiển thị khoản bảo lãnh hợp đồng (chỉ áp dụng pricing_model=
+            # "Project"): giá trị bảo lãnh KHÔNG được trừ vào các số liệu tài chính ở
+            # trên (KPI Funding Amount vẫn giữ nguyên đúng khoản vay bù đắp dòng tiền) —
+            # đây là gói vay được tìm riêng cho khoản bảo lãnh. Cảnh báo cần Founder phê
+            # duyệt (nếu > 300 triệu) do AI (Guarantee Compliance Agent) sinh ra.
+            # Đặt TRƯỚC Founder Approval Gate theo yêu cầu bố cục.
+            guarantee_result = result.get("guarantee_result")
+            if guarantee_result and guarantee_result.get("guarantee_amount", 0) > 0:
+                st.markdown(
+                    '<div class="dash-section-title dash-container" style="margin-top: 40px;">'
+                    '<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" '
+                    'viewBox="0 0 24 24" style="color: #d97706;"><path stroke-linecap="round" '
+                    'stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> '
+                    'Bảo lãnh Hợp đồng (Project)</div>',
+                    unsafe_allow_html=True,
+                )
+                g_loan = guarantee_result.get("guarantee_loan_option")
+                g_loan_html = (
+                    f"{g_loan['product_name']} — {g_loan['bank']}"
+                    if g_loan
+                    else "Chưa có gói vay eligible trong 11_BANK_PRODUCTS cho khoản bảo lãnh này"
+                )
+                st.markdown(f"""
+<div class="dash-container" style="background: white; border-radius: 16px; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 16px;">
+<div style="font-size: 0.85rem; color: #64748b;">Tỷ lệ bảo lãnh: <strong>{guarantee_result['guarantee_percent']:.1f}%</strong> · Giá trị hợp đồng Project: <strong>{format_vnd(guarantee_result['project_contract_value'])}</strong></div>
+<div style="font-size: 1.15rem; color: #0f172a; font-weight: 700; margin-top: 10px;">Khoản vay bảo lãnh cần huy động: {format_vnd(guarantee_result['guarantee_amount'])}</div>
+<div style="font-size: 0.9rem; color: #334155; margin-top: 10px;">Gói vay bảo lãnh phù hợp: <strong>{g_loan_html}</strong></div>
+</div>
+                """, unsafe_allow_html=True)
+
+                guarantee_warning = guarantee_result.get("warning")
+                if guarantee_warning:
+                    st.markdown(f"""
+<div class="dash-container" style="background: #fdf2f8; border-left: 4px solid #f43f5e; padding: 16px 20px; border-radius: 0 12px 12px 0; margin-bottom: 20px;">
+<div style="color: #be123c; font-weight: 700; font-size: 0.85rem; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">⚠️ CẢNH BÁO — CẦN FOUNDER PHÊ DUYỆT KHOẢN VAY BẢO LÃNH</div>
+<div style="color: #9f1239; font-size: 0.95rem; line-height: 1.5;">{guarantee_warning['warning_message']}</div>
+</div>
+                    """, unsafe_allow_html=True)
+
             st.markdown('<div class="dash-section-title dash-container" style="margin-top: 40px;"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: #3b82f6;"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg> Founder Approval Gate</div>', unsafe_allow_html=True)
             
             sensitive = decision["human_approval_required"] or result["founder_approval_needed"]
@@ -4508,44 +4547,6 @@ và khuyến nghị quyết định dành cho Founder.
 <div style="font-size: 1.25rem; font-weight: 800; color: #475569; letter-spacing: 0.05em; margin-bottom: 4px;">PENDING APPROVAL</div>
 <div style="font-size: 0.95rem; color: #64748b;">Đang chờ Founder xem xét các chỉ số và đưa ra quyết định cuối cùng...</div>
 </div>
-</div>
-                    """, unsafe_allow_html=True)
-
-            # [BỔ SUNG] Hiển thị khoản bảo lãnh hợp đồng (chỉ áp dụng pricing_model=
-            # "Project"): giá trị bảo lãnh KHÔNG được trừ vào các số liệu tài chính ở
-            # trên (KPI Funding Amount vẫn giữ nguyên đúng khoản vay bù đắp dòng tiền) —
-            # đây là gói vay được tìm riêng cho khoản bảo lãnh. Cảnh báo cần Founder phê
-            # duyệt (nếu > 300 triệu) do AI (Guarantee Compliance Agent) sinh ra.
-            guarantee_result = result.get("guarantee_result")
-            if guarantee_result and guarantee_result.get("guarantee_amount", 0) > 0:
-                st.markdown(
-                    '<div class="dash-section-title dash-container" style="margin-top: 40px;">'
-                    '<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" '
-                    'viewBox="0 0 24 24" style="color: #d97706;"><path stroke-linecap="round" '
-                    'stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> '
-                    'Bảo lãnh Hợp đồng (Project)</div>',
-                    unsafe_allow_html=True,
-                )
-                g_loan = guarantee_result.get("guarantee_loan_option")
-                g_loan_html = (
-                    f"{g_loan['product_name']} — {g_loan['bank']}"
-                    if g_loan
-                    else "Chưa có gói vay eligible trong 11_BANK_PRODUCTS cho khoản bảo lãnh này"
-                )
-                st.markdown(f"""
-<div class="dash-container" style="background: white; border-radius: 16px; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 16px;">
-<div style="font-size: 0.85rem; color: #64748b;">Tỷ lệ bảo lãnh: <strong>{guarantee_result['guarantee_percent']:.1f}%</strong> · Giá trị hợp đồng Project: <strong>{format_vnd(guarantee_result['project_contract_value'])}</strong></div>
-<div style="font-size: 1.15rem; color: #0f172a; font-weight: 700; margin-top: 10px;">Khoản vay bảo lãnh cần huy động: {format_vnd(guarantee_result['guarantee_amount'])}</div>
-<div style="font-size: 0.9rem; color: #334155; margin-top: 10px;">Gói vay bảo lãnh phù hợp: <strong>{g_loan_html}</strong></div>
-</div>
-                """, unsafe_allow_html=True)
-
-                guarantee_warning = guarantee_result.get("warning")
-                if guarantee_warning:
-                    st.markdown(f"""
-<div class="dash-container" style="background: #fdf2f8; border-left: 4px solid #f43f5e; padding: 16px 20px; border-radius: 0 12px 12px 0; margin-bottom: 20px;">
-<div style="color: #be123c; font-weight: 700; font-size: 0.85rem; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">⚠️ CẢNH BÁO — CẦN FOUNDER PHÊ DUYỆT KHOẢN VAY BẢO LÃNH</div>
-<div style="color: #9f1239; font-size: 0.95rem; line-height: 1.5;">{guarantee_warning['warning_message']}</div>
 </div>
                     """, unsafe_allow_html=True)
 
