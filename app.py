@@ -4394,7 +4394,17 @@ và khuyến nghị quyết định dành cho Founder.
             reasons_html = "<ul class='reasons-list dash-container'>" + "".join([f"<li>{check_svg} <span>{r}</span></li>" for r in decision["three_reasons"]]) + "</ul>"
             st.markdown(reasons_html, unsafe_allow_html=True)
 
-            st.markdown('<div class="dash-section-title dash-container" style="margin-top: 40px;"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: #ef4444;"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg> Quản trị Rủi ro</div>', unsafe_allow_html=True)
+            st.markdown(f"""
+<div class="dash-container" style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 16px; padding: 20px; margin-top: 20px; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(251, 191, 36, 0.1);">
+<div style="font-size: 0.85rem; color: #b45309; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.05em;">
+<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg> Protection Condition
+</div>
+<div style="font-size: 0.95rem; color: #92400e; line-height: 1.6;">{decision['protection_condition']}</div>
+</div>
+            """, unsafe_allow_html=True)
+
+        with dash_col2:
+            st.markdown('<div class="dash-section-title dash-container"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: #ef4444;"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg> Quản trị Rủi ro</div>', unsafe_allow_html=True)
 
             risk_level = risk_result["risk_level"]
             risk_summary = build_risk_summary_message(
@@ -4407,16 +4417,6 @@ và khuyến nghị quyết định dành cho Founder.
             else:
                 st.success(f"✅ **Risk Level: {risk_level}**\n\n{risk_summary['message']}")
 
-            st.markdown(f"""
-<div class="dash-container" style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 16px; padding: 20px; margin-top: 20px; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(251, 191, 36, 0.1);">
-<div style="font-size: 0.85rem; color: #b45309; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.05em;">
-<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg> Protection Condition
-</div>
-<div style="font-size: 0.95rem; color: #92400e; line-height: 1.6;">{decision['protection_condition']}</div>
-</div>
-            """, unsafe_allow_html=True)
-
-        with dash_col2:
             if result["missing_fields"]:
                 st.markdown(f"""
 <div class="dash-container" style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 16px; padding: 20px; margin-bottom: 24px;">
