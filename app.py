@@ -124,6 +124,16 @@ class DecisionAgentOutput(BaseModel):
     executive_summary: str
 
 
+# [BỔ SUNG] Output của Guarantee Compliance Agent — cảnh báo cần Founder phê duyệt
+# khoản vay bảo lãnh hợp đồng (pricing_model="Project") khi guarantee_amount > 300tr.
+# Nội dung cảnh báo (warning_message) BẮT BUỘC do AI sinh ra, không hard-code trong
+# code Python, để tránh trùng lặp với build_protection_condition() (vốn cố tình tất
+# định cho "điều kiện bảo vệ" của Decision Card chính — hai việc khác nhau).
+class GuaranteeApprovalWarningOutput(BaseModel):
+    requires_founder_approval: bool
+    warning_message: str
+
+
 # ============================================================
 # 2.5 DATA MASKING — API-H-004 / API-H-007 (22_API_HANDLING_RULES)
 #     theo đúng ví dụ trong 21_MASKING_EXAMPLES.
@@ -1000,6 +1010,58 @@ def build_partner_matrix(
     return matrix
 
 
+def build_guarantee_partner_matrix(
+    data: dict[str, pd.DataFrame],
+    guarantee_amount: float,
+) -> list[dict]:
+    """[BỔ SUNG] Tìm gói vay phù hợp cho khoản BẢO LÃNH HỢP ĐỒNG (chỉ áp dụng khi sản
+    phẩm có pricing_model = "Project").
+
+    Giá trị bảo lãnh (guarantee_amount) KHÔNG được trừ trực tiếp vào finance_metrics/
+    cash_projection hiện có — nó là một nhu cầu vốn ĐỘC LẬP với dòng tiền dự phóng
+    (khác build_partner_matrix() vốn chỉ chạy khi cash_projection["cash_reserve_breach"]
+    =True để bù đắp RR-002). Hàm này chuyển guarantee_amount sang bước tìm gói vay phù
+    hợp riêng, dùng lại đúng logic Lọc 4 Lớp: Lớp 1 — chỉ giữ credit_cash (loại
+    account_ops/credit_guarantee/unclassified); Lớp 2 — eligible khi guarantee_amount
+    đạt đủ minimum_amount; Lớp 3 — so sánh tổng chi phí (annual_rate_or_fee +
+    processing_fee_rate); Lớp 4 — ưu tiên collateral_ratio thấp hơn khi Lớp 3 bằng nhau.
+    """
+    if guarantee_amount <= 0:
+        return []
+
+    candidates = data["11_BANK_PRODUCTS"].copy()
+    matrix = []
+    for _, product in candidates.iterrows():
+        category, _reason = classify_bank_product(
+            str(product["product_name"]), str(product.get("description", ""))
+        )
+        if category != "credit_cash":
+            continue
+
+        min_amount = float(product["minimum_amount"])
+        total_cost_rate = float(product["annual_rate_or_fee"]) + float(product["processing_fee_rate"])
+        eligible = guarantee_amount >= min_amount
+        matrix.append(
+            {
+                "bank_product_id": clean_value(product["bank_product_id"]),
+                "bank": clean_value(product["bank"]),
+                "product_name": clean_value(product["product_name"]),
+                "target_segment": clean_value(product["target_segment"]),
+                "product_category": category,
+                "annual_rate_or_fee": float(product["annual_rate_or_fee"]),
+                "processing_fee_rate": float(product["processing_fee_rate"]),
+                "collateral_ratio": float(product["collateral_ratio"]),
+                "minimum_amount": min_amount,
+                "automation_level": clean_value(product["automation_level"]),
+                "total_cost_rate": round(total_cost_rate, 4),
+                "eligible": eligible,
+            }
+        )
+
+    matrix.sort(key=lambda item: (not item["eligible"], item["total_cost_rate"], item["collateral_ratio"]))
+    return matrix
+
+
 def determine_requested_amount(cash_projection: dict, partner_matrix: list[dict]) -> float:
     """Số tiền yêu cầu = phần thiếu hụt so với ngưỡng dự trữ tối thiểu, tối thiểu
     bằng minimum_amount của sản phẩm ngân hàng phù hợp nhất — CHỈ KHI sản phẩm đó
@@ -1173,6 +1235,40 @@ Quy tắc bắt buộc:
     + NEED_MORE_DATA: Chỉ kích hoạt khi có thông tin đầu vào thiếu. Còn lại không được phép kích hoạt. 
 """
     return call_structured_agent(client, model, instructions, payload, DecisionAgentOutput)
+
+
+def run_guarantee_warning_agent(client, model, payload):
+    """[BỔ SUNG] Guarantee Compliance Agent — CHỈ được gọi khi guarantee_amount (khoản
+    bảo lãnh hợp đồng, tính trên % bảo lãnh nhập ở Input, chỉ áp dụng pricing_model=
+    "Project") đã VƯỢT ngưỡng 300.000.000 VND, sau khi đã xác định gói vay bảo lãnh phù
+    hợp (guarantee_loan_option) từ build_guarantee_partner_matrix(). Cảnh báo trả về
+    (warning_message) do AI viết dựa trên đúng số liệu Python cung cấp, phục vụ Founder
+    Approval Gate riêng cho khoản bảo lãnh này."""
+    instructions = """
+Bạn là Guarantee Compliance Agent của OPC.
+
+Nhiệm vụ:
+Viết cảnh báo ngắn gọn bằng tiếng Việt cho Founder, giải thích rằng khoản vay bảo
+lãnh hợp đồng (guarantee_amount) đã vượt ngưỡng 300.000.000 VND (RR-005) nên BẮT
+BUỘC cần Founder phê duyệt riêng trước khi ký/giải ngân khoản bảo lãnh, dựa đúng
+trên các số liệu được cung cấp: guarantee_percent, project_contract_value,
+guarantee_amount, large_decision_threshold, guarantee_loan_option.
+
+Quy tắc bắt buộc:
+- requires_founder_approval PHẢI = true (payload này chỉ được gọi khi guarantee_amount
+  đã vượt ngưỡng).
+- Không tự bịa số liệu, gói vay, ngân hàng hay lãi suất ngoài payload được cung cấp.
+- Nếu guarantee_loan_option là null, phải nêu rõ hiện chưa có gói vay eligible trong
+  11_BANK_PRODUCTS cho khoản bảo lãnh này, Founder cần rà soát thêm.
+- warning_message: 1 đoạn ngắn (tối đa khoảng 60 từ), nêu rõ số tiền bảo lãnh cụ thể,
+  tỷ lệ % bảo lãnh, ngưỡng 300 triệu, và tên gói vay bảo lãnh phù hợp đã chọn (nếu có).
+- Không dùng lại nguyên văn protection_condition của Decision Card chính — đây là
+  cảnh báo riêng cho khoản bảo lãnh hợp đồng.
+- Chỉ dựa trên payload được cung cấp, viết rõ ràng để Founder ra quyết định ngay.
+"""
+    return call_structured_agent(
+        client, model, instructions, payload, GuaranteeApprovalWarningOutput, "Guarantee Compliance Agent"
+    )
 
 
 def build_protection_condition(
@@ -2628,7 +2724,7 @@ with st.sidebar:
     api_key = api_key_input.strip() or OPENAI_API_KEY_HARDCODED.strip() or env_key
     model = st.text_input(
         "Model",
-        value="gpt-5-mini",
+        value="gpt-4.1",
         key="model_input_v4",
         help="Model OpenAI hỗ trợ Structured Outputs, ví dụ: gpt-5, gpt-5-mini,gpt-4o-mini, gpt-4o, gpt-4.1, gpt-4.1-mini.",
     )
@@ -2940,6 +3036,29 @@ trước khi ra Decision Card.
 
                 st.metric("Tổng list_price", format_vnd(total_list_price))
 
+                # [BỔ SUNG] Phần trăm bảo lãnh hợp đồng — CHỈ áp dụng với dịch vụ có
+                # pricing_model = "Project". Giá trị này KHÔNG được trừ trực tiếp vào
+                # finance_metrics/cash_projection hiện có ở đây; nó chỉ được thu thập
+                # tại bước Input và sẽ được chuyển sang bước tìm gói vay phù hợp riêng
+                # (build_guarantee_partner_matrix) sau khi bấm "Chạy Multi-Agent".
+                project_products_preview = (
+                    selected_products.loc[selected_products["pricing_model"] == PRICING_MODEL_PROJECT]
+                    if not selected_products.empty
+                    else selected_products
+                )
+                has_project_pricing = not project_products_preview.empty
+                guarantee_percent = 0.0
+                if has_project_pricing:
+                    guarantee_percent = st.number_input(
+                        "Phần trăm bảo lãnh hợp đồng (%)",
+                        min_value=10.0,
+                        value=10.0,
+                        step=1.0,
+                        help="Chỉ áp dụng cho các dịch vụ có pricing_model = 'Project'. Giá trị "
+                        "bảo lãnh sẽ được chuyển sang bước tìm gói vay phù hợp (11_BANK_PRODUCTS), "
+                        "không trừ trực tiếp vào các số liệu tài chính hiện có.",
+                    )
+
                 date_col1, date_col2 = st.columns(2)
                 with date_col1:
                     order_date_input = st.date_input("order_date")
@@ -3023,6 +3142,31 @@ trước khi ra Decision Card.
                         )
                         requested_amount = determine_requested_amount(cash_projection, partner_matrix)
                         founder_approval_needed = requested_amount > LARGE_DECISION_THRESHOLD
+
+                        # [BỔ SUNG] Bảo lãnh hợp đồng (chỉ áp dụng pricing_model="Project"):
+                        # guarantee_amount KHÔNG được cộng/trừ vào finance_metrics, cash_projection,
+                        # partner_matrix hay requested_amount ở trên — nó được chuyển sang một bước
+                        # tìm gói vay phù hợp RIÊNG (build_guarantee_partner_matrix), độc lập với
+                        # phần bù đắp dòng tiền RR-002 đã xử lý phía trên.
+                        project_products_for_guarantee = selected_products.loc[
+                            selected_products["pricing_model"] == PRICING_MODEL_PROJECT
+                        ]
+                        project_contract_value = (
+                            float(project_products_for_guarantee["list_price"].sum())
+                            if not project_products_for_guarantee.empty
+                            else 0.0
+                        )
+                        guarantee_amount = (
+                            project_contract_value * (float(guarantee_percent) / 100.0)
+                            if (has_project_pricing and guarantee_percent)
+                            else 0.0
+                        )
+                        guarantee_partner_matrix = build_guarantee_partner_matrix(
+                            data=data, guarantee_amount=guarantee_amount
+                        )
+                        guarantee_loan_option = next(
+                            (item for item in guarantee_partner_matrix if item["eligible"]), None
+                        )
                         bank_product_classification = classify_all_bank_products(data)
 
                         confidence_result = compute_confidence_score(
@@ -3185,6 +3329,61 @@ trước khi ra Decision Card.
                                     "timestamp": time.strftime("%H:%M:%S %d/%m/%Y"),
                                 }
                             )
+                            # [BỔ SUNG] Sau khi đã xác định gói vay bảo lãnh phù hợp
+                            # (guarantee_loan_option, từ build_guarantee_partner_matrix ở trên),
+                            # nếu guarantee_amount > 300 triệu (RR-005) thì gọi AI sinh cảnh báo
+                            # cần Founder phê duyệt riêng cho khoản vay bảo lãnh này. Cảnh báo
+                            # BẮT BUỘC do AI viết (không hard-code chuỗi cố định trong Python).
+                            guarantee_result_payload = None
+                            if guarantee_amount > 0:
+                                if guarantee_amount > LARGE_DECISION_THRESHOLD:
+                                    st.write("⏳ Đang làm mát hệ thống (tránh Rate Limit)...")
+                                    time.sleep(4)
+                                    st.write("④ Guarantee Compliance Agent đang kiểm tra khoản bảo lãnh...")
+                                    guarantee_payload = {
+                                        "guarantee_percent": float(guarantee_percent),
+                                        "project_contract_value": project_contract_value,
+                                        "guarantee_amount": guarantee_amount,
+                                        "large_decision_threshold": LARGE_DECISION_THRESHOLD,
+                                        "guarantee_partner_matrix": guarantee_partner_matrix,
+                                        "guarantee_loan_option": guarantee_loan_option,
+                                    }
+                                    masked_guarantee_payload, guarantee_masked_fields = mask_sensitive_fields(
+                                        guarantee_payload
+                                    )
+                                    guarantee_warning_result, guarantee_response_id = run_guarantee_warning_agent(
+                                        client, model, masked_guarantee_payload
+                                    )
+                                    workflow_logs.append(
+                                        {
+                                            "agent": "Guarantee Compliance Agent",
+                                            "response_id": guarantee_response_id,
+                                            "result": guarantee_warning_result.model_dump(),
+                                            "masked_fields": guarantee_masked_fields,
+                                            "input": masked_guarantee_payload,
+                                            "action": "Kiểm tra khoản vay bảo lãnh hợp đồng (pricing_model=Project) sau khi đã chọn gói vay phù hợp và sinh cảnh báo cần Founder phê duyệt vì > 300 triệu VND.",
+                                            "timestamp": time.strftime("%H:%M:%S %d/%m/%Y"),
+                                        }
+                                    )
+                                    st.write("✓ Guarantee Compliance Agent hoàn tất")
+                                    guarantee_result_payload = {
+                                        "guarantee_percent": float(guarantee_percent),
+                                        "project_contract_value": project_contract_value,
+                                        "guarantee_amount": guarantee_amount,
+                                        "guarantee_partner_matrix": guarantee_partner_matrix,
+                                        "guarantee_loan_option": guarantee_loan_option,
+                                        "warning": guarantee_warning_result.model_dump(),
+                                    }
+                                else:
+                                    guarantee_result_payload = {
+                                        "guarantee_percent": float(guarantee_percent),
+                                        "project_contract_value": project_contract_value,
+                                        "guarantee_amount": guarantee_amount,
+                                        "guarantee_partner_matrix": guarantee_partner_matrix,
+                                        "guarantee_loan_option": guarantee_loan_option,
+                                        "warning": None,
+                                    }
+
                             elapsed = time.perf_counter() - start
                             st.write("✓ Decision & Partner Agent hoàn tất")
                             status.update(
@@ -3261,6 +3460,7 @@ trước khi ra Decision Card.
                             "bank_product_classification": bank_product_classification,
                             "requested_amount": requested_amount,
                             "founder_approval_needed": founder_approval_needed,
+                            "guarantee_result": guarantee_result_payload,
                             "finance_result": finance_result.model_dump(),
                             "risk_result": risk_result.model_dump(),
                             "decision_result": decision_result.model_dump(),
@@ -4311,6 +4511,44 @@ và khuyến nghị quyết định dành cho Founder.
 </div>
                     """, unsafe_allow_html=True)
 
+            # [BỔ SUNG] Hiển thị khoản bảo lãnh hợp đồng (chỉ áp dụng pricing_model=
+            # "Project"): giá trị bảo lãnh KHÔNG được trừ vào các số liệu tài chính ở
+            # trên (KPI Funding Amount vẫn giữ nguyên đúng khoản vay bù đắp dòng tiền) —
+            # đây là gói vay được tìm riêng cho khoản bảo lãnh. Cảnh báo cần Founder phê
+            # duyệt (nếu > 300 triệu) do AI (Guarantee Compliance Agent) sinh ra.
+            guarantee_result = result.get("guarantee_result")
+            if guarantee_result and guarantee_result.get("guarantee_amount", 0) > 0:
+                st.markdown(
+                    '<div class="dash-section-title dash-container" style="margin-top: 40px;">'
+                    '<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" '
+                    'viewBox="0 0 24 24" style="color: #d97706;"><path stroke-linecap="round" '
+                    'stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> '
+                    'Bảo lãnh Hợp đồng (Project)</div>',
+                    unsafe_allow_html=True,
+                )
+                g_loan = guarantee_result.get("guarantee_loan_option")
+                g_loan_html = (
+                    f"{g_loan['product_name']} — {g_loan['bank']}"
+                    if g_loan
+                    else "Chưa có gói vay eligible trong 11_BANK_PRODUCTS cho khoản bảo lãnh này"
+                )
+                st.markdown(f"""
+<div class="dash-container" style="background: white; border-radius: 16px; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 16px;">
+<div style="font-size: 0.85rem; color: #64748b;">Tỷ lệ bảo lãnh: <strong>{guarantee_result['guarantee_percent']:.1f}%</strong> · Giá trị hợp đồng Project: <strong>{format_vnd(guarantee_result['project_contract_value'])}</strong></div>
+<div style="font-size: 1.15rem; color: #0f172a; font-weight: 700; margin-top: 10px;">Khoản vay bảo lãnh cần huy động: {format_vnd(guarantee_result['guarantee_amount'])}</div>
+<div style="font-size: 0.9rem; color: #334155; margin-top: 10px;">Gói vay bảo lãnh phù hợp: <strong>{g_loan_html}</strong></div>
+</div>
+                """, unsafe_allow_html=True)
+
+                guarantee_warning = guarantee_result.get("warning")
+                if guarantee_warning:
+                    st.markdown(f"""
+<div class="dash-container" style="background: #fdf2f8; border-left: 4px solid #f43f5e; padding: 16px 20px; border-radius: 0 12px 12px 0; margin-bottom: 20px;">
+<div style="color: #be123c; font-weight: 700; font-size: 0.85rem; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">⚠️ CẢNH BÁO — CẦN FOUNDER PHÊ DUYỆT KHOẢN VAY BẢO LÃNH</div>
+<div style="color: #9f1239; font-size: 0.95rem; line-height: 1.5;">{guarantee_warning['warning_message']}</div>
+</div>
+                    """, unsafe_allow_html=True)
+
         export_payload = {
             "model": result["model"],
             "customer": result["customer"],
@@ -4324,6 +4562,7 @@ và khuyến nghị quyết định dành cho Founder.
             "missing_fields": result["missing_fields"],
             "founder_decision": founder_decision,
             "sensitive_threshold_flagged": sensitive,
+            "guarantee_result": guarantee_result,
             "openai_response_ids": [item["response_id"] for item in result["workflow_logs"]],
             "crisis_card": st.session_state.get("crisis_card"),
             "crisis_result": st.session_state.get("crisis_result"),
