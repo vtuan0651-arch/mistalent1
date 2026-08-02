@@ -1532,6 +1532,51 @@ def evaluate_api_handling_checklist(
 # 7.6 CRISIS CARD — MVP1, MVP2, MVP3, MVP5 (MODELS & LOGIC)
 # ============================================================
 
+# [BỔ SUNG] PAYMENT_METHOD_MILESTONE / PAYMENT_METHOD_LC — 2 phương thức thanh
+# toán thay thế cho phần dịch vụ "Project" (pricing_model = PRICING_MODEL_PROJECT),
+# đặt ngay sau PERFORMANCE_BOND trong Crisis Card. Founder có thể chọn để tính lại
+# TOÀN BỘ dòng tiền cash-in hàng tháng của phần Project (ảnh hưởng trực tiếp đến số
+# tiền cần vay vốn), thay cho giả định chia đều tuyến tính đang dùng ở baseline
+# (project_closing_cash). 2 phương thức này KHÔNG áp dụng đồng thời (loại trừ lẫn
+# nhau, xem validate_crisis_card_input).
+#
+# Milestone — 4 mốc chuẩn (anchor) theo đúng công thức:
+#   ORDER_DATE  : Tạm ứng ký HĐ         -> cash-in vào Order Date.
+#   DESIGN_DONE : Xong thiết kế         -> cash-in vào CUỐI THÁNG chứa ngày
+#                                          Order Date + (Due Date - Order Date)/3.
+#   PRODUCT_DONE: Xong sản phẩm         -> cash-in vào Due Date.
+#   STABLE_OPS  : Vận hành ổn định 1 tháng -> cash-in vào Due Date + 30 ngày.
+# Founder có thể đổi SỐ LƯỢNG milestone (thêm/bớt) và % của từng milestone (mỗi
+# milestone vẫn phải chọn 1 trong 4 anchor trên, anchor có thể lặp lại) — cả qua
+# biểu mẫu lẫn qua prompt tự do (AI trích xuất), xem CrisisCardPromptExtraction.
+#
+# LC — thu toàn bộ giá trị hợp đồng phần Project vào Due Date + 5 ngày, không có
+# tham số nào khác cần Founder nhập thêm.
+class PaymentMethodMilestoneItem(BaseModel):
+    name: str
+    anchor: Literal["ORDER_DATE", "DESIGN_DONE", "PRODUCT_DONE", "STABLE_OPS"]
+    percent: float = Field(gt=0, le=100)
+
+
+PAYMENT_METHOD_MILESTONE_ANCHOR_LABELS = {
+    "ORDER_DATE": "1. Tạm ứng ký HĐ (cash-in vào Order Date)",
+    "DESIGN_DONE": "2. Xong thiết kế (cash-in cuối tháng chứa Order Date + (Due-Order)/3)",
+    "PRODUCT_DONE": "3. Xong sản phẩm (cash-in vào Due Date)",
+    "STABLE_OPS": "4. Vận hành ổn định 1 tháng (cash-in vào Due Date + 30 ngày)",
+}
+
+# Mẫu mặc định đúng ví dụ minh họa trong System Prompt (20% - 30% - 30% - 20%),
+# dùng khi PAYMENT_METHOD_MILESTONE được chọn nhưng Founder không tự nhập milestones.
+DEFAULT_PAYMENT_METHOD_MILESTONES = [
+    {"name": "Tạm ứng ký HĐ", "anchor": "ORDER_DATE", "percent": 20.0},
+    {"name": "Xong thiết kế", "anchor": "DESIGN_DONE", "percent": 30.0},
+    {"name": "Xong sản phẩm", "anchor": "PRODUCT_DONE", "percent": 30.0},
+    {"name": "Vận hành ổn định 1 tháng", "anchor": "STABLE_OPS", "percent": 20.0},
+]
+
+LC_DUE_DATE_OFFSET_DAYS = 5  # LC: thu toàn bộ giá trị hợp đồng vào Due Date + 5 ngày.
+
+
 class CrisisCardInput(BaseModel):
     crisis_group: list[Literal[
         "DEADLINE_EARLY", "DEADLINE_LATE",
@@ -1539,6 +1584,8 @@ class CrisisCardInput(BaseModel):
         "PAYMENT_DELAY",
         "FINANCE_CONDITION",
         "SCOPE_CHANGE", "ORDER_CHANGE",
+        "PERFORMANCE_BOND",
+        "PAYMENT_METHOD_MILESTONE", "PAYMENT_METHOD_LC",
     ]] = Field(max_length=2)
     contract_id: str
     days_deviation: Optional[int] = None
@@ -1555,6 +1602,17 @@ class CrisisCardInput(BaseModel):
     new_collateral_ratio: Optional[float] = None
     new_num_provinces: Optional[int] = None
     new_order_count: Optional[int] = None
+    # [BỔ SUNG] PERFORMANCE_BOND — giá trị bảo lãnh hợp đồng (Performance Bond) có
+    # thể được Founder thay đổi ngay trong Crisis Card. Khi nhóm này được chọn,
+    # hệ thống tìm gói vay bảo lãnh phù hợp (build_guarantee_partner_matrix) và
+    # cộng total_fee = funding_amount x (annual_rate_or_fee + processing_fee_rate)
+    # trực tiếp vào estimated_cost (xem resolve_crisis_deltas).
+    performance_bond_amount: Optional[float] = None
+    # [BỔ SUNG] PAYMENT_METHOD_MILESTONE — danh sách milestone tùy chỉnh (số lượng
+    # + % mỗi milestone Founder tự đổi được). None/rỗng -> dùng
+    # DEFAULT_PAYMENT_METHOD_MILESTONES (mẫu 20/30/30/20 trong System Prompt).
+    # Không dùng cho PAYMENT_METHOD_LC (LC có công thức cố định, không cần nhập).
+    milestones: Optional[list[PaymentMethodMilestoneItem]] = None
     raw_prompt_text: Optional[str] = None
 
 def validate_crisis_card_input(crisis: CrisisCardInput) -> list[str]:
@@ -1584,6 +1642,19 @@ def validate_crisis_card_input(crisis: CrisisCardInput) -> list[str]:
         errors.append("Cần nhập số tỉnh/thành phố mới.")
     if "ORDER_CHANGE" in crisis.crisis_group and not crisis.new_order_count:
         errors.append("Cần nhập số lượng đơn hàng mới.")
+    if "PERFORMANCE_BOND" in crisis.crisis_group and not crisis.performance_bond_amount:
+        errors.append("Cần nhập giá trị bảo lãnh hợp đồng (Performance Bond).")
+    # [BỔ SUNG] PAYMENT_METHOD_MILESTONE / PAYMENT_METHOD_LC — 2 phương thức thay
+    # thế cho dòng tiền phần Project, không thể chọn đồng thời (loại trừ lẫn nhau
+    # giống DEADLINE_EARLY/DEADLINE_LATE ở trên).
+    if "PAYMENT_METHOD_MILESTONE" in crisis.crisis_group and "PAYMENT_METHOD_LC" in crisis.crisis_group:
+        errors.append("Không thể chọn đồng thời 2 phương thức thanh toán Milestone và LC cho cùng một biến động.")
+    if "PAYMENT_METHOD_MILESTONE" in crisis.crisis_group and crisis.milestones:
+        if len(crisis.milestones) < 1:
+            errors.append("Cần ít nhất 1 milestone cho phương thức thanh toán theo Milestone.")
+        total_pct = sum(m.percent for m in crisis.milestones)
+        if abs(total_pct - 100.0) > 0.5:
+            errors.append(f"Tổng % các milestone phải xấp xỉ 100% (hiện đang là {total_pct:.2f}%).")
     return errors
 
 class CrisisDelta(BaseModel):
@@ -1597,6 +1668,17 @@ class CrisisDelta(BaseModel):
     # không trả về Decision Card nào). Nay chuyển sang cờ tất định để UI tự xử lý
     # thành 1 quyết định TERMINATE rõ ràng thay vì crash.
     hard_cap_exceeded: bool = False
+    # [BỔ SUNG] PERFORMANCE_BOND — lưu lại gói vay bảo lãnh phù hợp (nếu có) và
+    # total_fee đã cộng vào estimated_cost, để tầng UI hiển thị ở phần Finance
+    # của Crisis Card mỗi khi Founder thay đổi giá trị bảo lãnh.
+    guarantee_amount: float = 0.0
+    guarantee_loan_option: Optional[dict] = None
+    guarantee_total_fee: float = 0.0
+    # [BỔ SUNG] PAYMENT_METHOD_MILESTONE / PAYMENT_METHOD_LC — spec phương thức
+    # thanh toán mới cho phần Project (method + milestones nếu có). Việc tính lại
+    # ngày/tháng cash-in cụ thể được thực hiện ở project_closing_cash_with_crisis()
+    # vì hàm này mới có sẵn order_date/due_date.
+    payment_method_override: Optional[dict] = None
     note: str
 
 class CrisisDecisionCardOutput(BaseModel):
@@ -1628,6 +1710,7 @@ def resolve_crisis_deltas(
     old_num_provinces: Optional[int] = None,
     baseline_estimated_cost: Optional[float] = None,
     old_order_count: Optional[int] = None,
+    data: Optional[dict[str, pd.DataFrame]] = None,
 ) -> CrisisDelta:
     extra_oper = 0.0
     extra_estimated_cost = 0.0
@@ -1635,6 +1718,10 @@ def resolve_crisis_deltas(
     payment_shift = None
     trigger_layer = None
     hard_cap_exceeded = False
+    guarantee_amount = 0.0
+    guarantee_loan_option = None
+    guarantee_total_fee = 0.0
+    payment_method_override = None
     notes = []
 
     for group in crisis.crisis_group:
@@ -1771,6 +1858,70 @@ def resolve_crisis_deltas(
             notes.append(
                 "Thay đổi điều kiện tài chính (" + ", ".join(changed_fields) + f") — re-filter từ lớp {layers_label}"
             )
+        elif group == "PERFORMANCE_BOND":
+            # [BỔ SUNG] Bảo lãnh hợp đồng (Performance Bond) — Founder có thể đổi
+            # giá trị bảo lãnh ngay trong Crisis Card. Tìm gói vay bảo lãnh phù hợp
+            # (build_guarantee_partner_matrix, đã eligible=True và ưu tiên tổng chi
+            # phí thấp nhất) rồi cộng total_fee = funding_amount x (annual_rate_or_fee
+            # + processing_fee_rate) TRỰC TIẾP vào estimated_cost.
+            guarantee_amount = float(crisis.performance_bond_amount or 0.0)
+            if guarantee_amount > 0 and data is not None:
+                bond_matrix = build_guarantee_partner_matrix(data=data, guarantee_amount=guarantee_amount)
+                guarantee_loan_option = next((item for item in bond_matrix if item["eligible"]), None)
+                if guarantee_loan_option:
+                    total_rate = (
+                        guarantee_loan_option["annual_rate_or_fee"]
+                        + guarantee_loan_option["processing_fee_rate"]
+                    )
+                    guarantee_total_fee = guarantee_amount * total_rate
+                    extra_estimated_cost += guarantee_total_fee
+                    notes.append(
+                        f"Bảo lãnh hợp đồng (Performance Bond) {guarantee_amount:,.0f} VNĐ — "
+                        f"gói vay phù hợp: {guarantee_loan_option['product_name']} ({guarantee_loan_option['bank']}), "
+                        f"total_fee = {guarantee_amount:,.0f} x {total_rate:.2%} = "
+                        f"{guarantee_total_fee:+,.0f} VNĐ (cộng trực tiếp vào estimated_cost)"
+                    )
+                else:
+                    notes.append(
+                        f"Bảo lãnh hợp đồng (Performance Bond) {guarantee_amount:,.0f} VNĐ — "
+                        "chưa có gói vay eligible trong 11_BANK_PRODUCTS cho khoản bảo lãnh này, "
+                        "chưa phát sinh total_fee."
+                    )
+            elif guarantee_amount > 0:
+                notes.append(
+                    f"Bảo lãnh hợp đồng (Performance Bond) {guarantee_amount:,.0f} VNĐ — "
+                    "thiếu dữ liệu 11_BANK_PRODUCTS để tìm gói vay phù hợp."
+                )
+        elif group == "PAYMENT_METHOD_MILESTONE":
+            # [BỔ SUNG] Đổi phương thức thanh toán phần Project sang THEO MILESTONE.
+            # Chỉ lưu lại spec (method + milestones) — việc tính lại cash-in theo
+            # từng tháng cụ thể cần order_date/due_date nên được thực hiện ở
+            # project_closing_cash_with_crisis().
+            milestone_items = crisis.milestones or [
+                PaymentMethodMilestoneItem(**item) for item in DEFAULT_PAYMENT_METHOD_MILESTONES
+            ]
+            total_pct = sum(m.percent for m in milestone_items)
+            payment_method_override = {
+                "method": "MILESTONE",
+                "milestones": [m.model_dump() for m in milestone_items],
+            }
+            notes.append(
+                "Đổi phương thức thanh toán (phần Project) sang THEO MILESTONE ("
+                + ", ".join(
+                    f"{m.name}: {m.percent:.1f}% @ {PAYMENT_METHOD_MILESTONE_ANCHOR_LABELS[m.anchor]}"
+                    for m in milestone_items
+                )
+                + f") — tổng % = {total_pct:.1f}%, tính lại dòng tiền cash-in hàng tháng."
+            )
+        elif group == "PAYMENT_METHOD_LC":
+            # [BỔ SUNG] Đổi phương thức thanh toán phần Project sang LC — thu toàn
+            # bộ giá trị hợp đồng (list price phần Project) vào Due Date + 5 ngày.
+            payment_method_override = {"method": "LC"}
+            notes.append(
+                f"Đổi phương thức thanh toán (phần Project) sang LC — thu toàn bộ giá trị "
+                f"hợp đồng vào Due Date + {LC_DUE_DATE_OFFSET_DAYS} ngày, "
+                "tính lại dòng tiền cash-in hàng tháng."
+            )
 
     return CrisisDelta(
         extra_oper=extra_oper,
@@ -1779,6 +1930,10 @@ def resolve_crisis_deltas(
         payment_shift=payment_shift,
         trigger_layer=trigger_layer,
         hard_cap_exceeded=hard_cap_exceeded,
+        guarantee_amount=guarantee_amount,
+        guarantee_loan_option=guarantee_loan_option,
+        guarantee_total_fee=guarantee_total_fee,
+        payment_method_override=payment_method_override,
         note="; ".join(notes)
     )
 
@@ -1815,7 +1970,8 @@ def project_closing_cash_with_crisis(
     finance_metrics: dict,
     order_date: pd.Timestamp,
     reserve_minimum: float,
-    crisis_delta: CrisisDelta
+    crisis_delta: CrisisDelta,
+    due_date: Optional[pd.Timestamp] = None,
 ) -> dict:
     proj = project_closing_cash(data, selected_products, finance_metrics, order_date, reserve_minimum)
     if not crisis_delta:
@@ -1825,7 +1981,80 @@ def project_closing_cash_with_crisis(
     
     if crisis_delta.extra_list_price != 0.0 and len(schedule) > 0:
         schedule[0]["deal_cash_in"] += crisis_delta.extra_list_price
-        
+
+    if crisis_delta.payment_method_override and schedule:
+        # [BỔ SUNG] PAYMENT_METHOD_MILESTONE / PAYMENT_METHOD_LC — tính lại TOÀN
+        # BỘ dòng tiền cash-in hàng tháng của phần dịch vụ "Project" theo phương
+        # thức thanh toán mới, thay cho giả định chia đều tuyến tính ở baseline
+        # (project_closing_cash). Không đụng tới phần Monthly Subscription /
+        # Initial Setup — chỉ phần Project mới áp dụng milestone/LC.
+        override = crisis_delta.payment_method_override
+        project_list_price = float(
+            selected_products.loc[
+                selected_products["pricing_model"].astype(str).str.strip() == PRICING_MODEL_PROJECT,
+                "list_price",
+            ].sum()
+        )
+        if project_list_price > 0 and due_date is not None:
+            months_count = len(schedule)
+            # Gỡ bỏ phần cash-in tuyến tính của baseline đã phân bổ cho phần Project
+            # (list_price_project / months_count mỗi tháng) để tránh cộng dồn 2 lần
+            # khi áp phương thức thanh toán mới.
+            linear_project_per_month = project_list_price / months_count if months_count else 0.0
+            for row in schedule:
+                row["deal_cash_in"] -= linear_project_per_month
+
+            def _month_str_of(ts: pd.Timestamp) -> str:
+                return str(pd.Timestamp(ts).to_period("M"))
+
+            def _add_cash_in(target_month: str, amount: float) -> bool:
+                for row in schedule:
+                    if row["month"] == target_month:
+                        row["deal_cash_in"] += amount
+                        return True
+                return False
+
+            unmatched_notes = []
+
+            if override["method"] == "MILESTONE":
+                for m in override["milestones"]:
+                    amount = project_list_price * (float(m["percent"]) / 100.0)
+                    if m["anchor"] == "ORDER_DATE":
+                        cash_in_date = order_date
+                    elif m["anchor"] == "DESIGN_DONE":
+                        cash_in_date = order_date + (due_date - order_date) / 3
+                    elif m["anchor"] == "PRODUCT_DONE":
+                        cash_in_date = due_date
+                    else:  # STABLE_OPS
+                        cash_in_date = due_date + pd.Timedelta(days=30)
+                    target_month = _month_str_of(cash_in_date)
+                    if not _add_cash_in(target_month, amount):
+                        # Mốc rơi ngoài phạm vi lịch dòng tiền hiện có -> cộng dồn vào
+                        # tháng CUỐI đã có trong lịch để không làm mất dòng tiền, đồng
+                        # thời cảnh báo cho Founder biết.
+                        schedule[-1]["deal_cash_in"] += amount
+                        unmatched_notes.append(
+                            f"Mốc '{m['name']}' ({pd.Timestamp(cash_in_date).date()}) nằm ngoài lịch "
+                            f"dòng tiền hiện có — đã cộng dồn vào tháng cuối ({schedule[-1]['month']})."
+                        )
+            else:  # LC
+                cash_in_date = due_date + pd.Timedelta(days=LC_DUE_DATE_OFFSET_DAYS)
+                target_month = _month_str_of(cash_in_date)
+                if not _add_cash_in(target_month, project_list_price):
+                    schedule[-1]["deal_cash_in"] += project_list_price
+                    unmatched_notes.append(
+                        f"Ngày thu LC ({pd.Timestamp(cash_in_date).date()}) nằm ngoài lịch dòng tiền "
+                        f"hiện có — đã cộng dồn vào tháng cuối ({schedule[-1]['month']})."
+                    )
+
+            if unmatched_notes:
+                proj["payment_method_warning"] = " ".join(unmatched_notes)
+        elif due_date is None:
+            proj["payment_method_warning"] = (
+                "Thiếu due_date để tính lại dòng tiền theo phương thức thanh toán mới — "
+                "chưa áp dụng được biến động Payment Method."
+            )
+
     if crisis_delta.payment_shift:
         late_month = crisis_delta.payment_shift["late_month"]
         # FIX (theo yêu cầu bổ sung): PAYMENT_DELAY áp dụng cho một tháng cụ thể
@@ -2028,6 +2257,8 @@ class CrisisCardPromptExtraction(BaseModel):
         "PAYMENT_DELAY",
         "FINANCE_CONDITION",
         "SCOPE_CHANGE", "ORDER_CHANGE",
+        "PERFORMANCE_BOND",
+        "PAYMENT_METHOD_MILESTONE", "PAYMENT_METHOD_LC",
     ]] = Field(max_length=2)
     days_deviation: Optional[int] = None
     extra_cost_amount: Optional[float] = None
@@ -2040,6 +2271,11 @@ class CrisisCardPromptExtraction(BaseModel):
     new_collateral_ratio: Optional[float] = None
     new_num_provinces: Optional[int] = None
     new_order_count: Optional[int] = None
+    performance_bond_amount: Optional[float] = None
+    # [BỔ SUNG] PAYMENT_METHOD_MILESTONE — cho phép AI tự trích xuất số lượng
+    # milestone và % mỗi milestone từ mô tả tự do (nếu prompt không nêu rõ, để
+    # trống/None -> hệ thống dùng DEFAULT_PAYMENT_METHOD_MILESTONES).
+    milestones: Optional[list[PaymentMethodMilestoneItem]] = None
     extraction_notes: str
 
 
@@ -2057,11 +2293,16 @@ Bạn là trợ lý trích xuất dữ liệu cho Crisis Card của OPC. Ngườ
 đọc kỹ mô tả và trả về CrisisCardPromptExtraction gồm đúng các trường sau, CHỈ điền
 những trường thực sự được đề cập, để trống (null) các trường không có thông tin:
 
-- crisis_group: chọn tối đa 2 trong 7 nhóm sau, đúng với mô tả:
+- crisis_group: chọn tối đa 2 trong 10 nhóm sau, đúng với mô tả:
   DEADLINE_EARLY (khách yêu cầu giao sớm), DEADLINE_LATE (OPC giao muộn),
   COST_CHANGE (phát sinh chi phí), PAYMENT_DELAY (khách trả muộn),
   FINANCE_CONDITION (đổi lãi suất/phí xử lý/tỷ lệ thế chấp),
-  SCOPE_CHANGE (đổi số tỉnh/thành triển khai), ORDER_CHANGE (đổi số lượng đơn hàng).
+  SCOPE_CHANGE (đổi số tỉnh/thành triển khai), ORDER_CHANGE (đổi số lượng đơn hàng),
+  PERFORMANCE_BOND (đổi/phát sinh giá trị bảo lãnh hợp đồng),
+  PAYMENT_METHOD_MILESTONE (đổi phương thức thanh toán phần Project sang thu tiền
+  theo cột mốc/milestone), PAYMENT_METHOD_LC (đổi phương thức thanh toán phần
+  Project sang LC — thu toàn bộ giá trị hợp đồng 1 lần vào Due Date + 5 ngày).
+  KHÔNG được chọn đồng thời cả PAYMENT_METHOD_MILESTONE và PAYMENT_METHOD_LC.
 - days_deviation: số ngày sớm/muộn (dùng cho DEADLINE_EARLY/DEADLINE_LATE).
 - extra_cost_amount: số tiền chi phí phát sinh (VNĐ, dùng cho COST_CHANGE, khi mô tả
   nêu con số tuyệt đối).
@@ -2073,6 +2314,15 @@ những trường thực sự được đề cập, để trống (null) các tr
   FINANCE_CONDITION (chỉ điền trường được đề cập rõ ràng, kể cả khi giá trị mới = 0).
 - new_num_provinces: dùng cho SCOPE_CHANGE.
 - new_order_count: dùng cho ORDER_CHANGE.
+- performance_bond_amount: giá trị bảo lãnh hợp đồng mới (VNĐ, dùng cho PERFORMANCE_BOND).
+- milestones: dùng cho PAYMENT_METHOD_MILESTONE — danh sách các cột mốc, mỗi cột mốc
+  gồm name (tên mốc), anchor (BẮT BUỘC chọn đúng 1 trong 4 giá trị: "ORDER_DATE" =
+  tạm ứng ký HĐ, "DESIGN_DONE" = xong thiết kế, "PRODUCT_DONE" = xong sản phẩm,
+  "STABLE_OPS" = vận hành ổn định 1 tháng) và percent (% trên tổng giá trị hợp đồng
+  phần Project, tổng các percent nên xấp xỉ 100%). Chỉ điền milestones khi prompt nêu
+  rõ số lượng mốc và/hoặc % cụ thể; nếu prompt chỉ nói chung chung "đổi sang thanh
+  toán theo milestone" mà không nêu chi tiết, để milestones = null (hệ thống sẽ tự
+  dùng mẫu mặc định 4 mốc 20%/30%/30%/20%).
 - extraction_notes: tóm tắt ngắn gọn (tiếng Việt) những gì bạn đã hiểu/suy luận từ
   prompt, và nêu rõ nếu có thông tin còn mơ hồ/thiếu để Founder tự kiểm tra lại.
 
@@ -3758,7 +4008,10 @@ CRISIS_GROUP_LABELS = {
     "PAYMENT_DELAY": "Chậm thanh toán (Payment Delay)",
     "FINANCE_CONDITION": "Thay đổi đ/k tài chính (Finance Condition)",
     "SCOPE_CHANGE": "Đổi địa bàn (Scope Change)",
-    "ORDER_CHANGE": "Đổi số lượng đơn hàng (Order Change)"
+    "ORDER_CHANGE": "Đổi số lượng đơn hàng (Order Change)",
+    "PERFORMANCE_BOND": "Bảo lãnh hợp đồng (Performance Bond)",
+    "PAYMENT_METHOD_MILESTONE": "Đổi PT thanh toán — Theo Milestone",
+    "PAYMENT_METHOD_LC": "Đổi PT thanh toán — LC (thư tín dụng)",
 }
 
 with tab_crisis:
@@ -3811,6 +4064,14 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
         validation_errors = []
 
         if input_mode == "📋 Biểu mẫu (form)":
+            # [BỔ SUNG] PAYMENT_METHOD_MILESTONE — số lượng milestone đặt NGOÀI
+            # st.form để mỗi lần Founder đổi số lượng, app rerun ngay và vẽ lại đúng
+            # số dòng nhập (name/anchor/%) bên trong form ở dưới.
+            milestone_count_input = st.number_input(
+                "Số lượng milestone (PAYMENT_METHOD_MILESTONE) — có thể thêm/bớt tùy ý",
+                min_value=1, max_value=8, value=len(DEFAULT_PAYMENT_METHOD_MILESTONES), step=1,
+                key="cc_milestone_count",
+            )
             with st.form("crisis_card_form"):
                 crisis_group = st.multiselect("Nhóm biến động (crisis_group)", list(CRISIS_GROUP_LABELS.keys()), format_func=lambda key: CRISIS_GROUP_LABELS[key], max_selections=2, key="cc_crisis_group")
 
@@ -3854,6 +4115,59 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                 new_num_provinces_input = st.number_input("Số tỉnh/thành phố mới", min_value=0, value=0, step=1, key="cc_new_num_provinces")
                 new_order_count_input = st.number_input("Số lượng đơn hàng mới", min_value=0, value=0, step=1, key="cc_new_order_count")
 
+                # [BỔ SUNG] PERFORMANCE_BOND — giá trị bảo lãnh hợp đồng có thể thay
+                # đổi ngay tại đây. total_fee = performance_bond_amount x
+                # (annual_rate_or_fee + processing_fee_rate) của gói vay bảo lãnh
+                # phù hợp sẽ được cộng trực tiếp vào estimated_cost.
+                performance_bond_amount_input = st.number_input(
+                    "Giá trị bảo lãnh hợp đồng — Performance Bond (VNĐ)",
+                    min_value=0.0, value=0.0, step=1_000_000.0, key="cc_performance_bond_amount",
+                )
+
+                # [BỔ SUNG] PAYMENT_METHOD_MILESTONE / PAYMENT_METHOD_LC — đặt ngay
+                # sau Performance Bond theo đúng bố cục Crisis Card.
+                st.markdown("---")
+                st.caption(
+                    "📌 **Đổi phương thức thanh toán (áp dụng cho phần dịch vụ Project)** — chỉ có hiệu lực "
+                    "khi chọn PAYMENT_METHOD_MILESTONE hoặc PAYMENT_METHOD_LC ở ô Nhóm biến động phía trên."
+                )
+                st.markdown(
+                    "**Theo Milestone** — mỗi milestone chọn 1 trong 4 mốc chuẩn: "
+                    "*Tạm ứng ký HĐ (Order Date)* · *Xong thiết kế (cuối tháng của Order Date + (Due-Order)/3)* · "
+                    "*Xong sản phẩm (Due Date)* · *Vận hành ổn định 1 tháng (Due Date + 30 ngày)*. "
+                    "Có thể đổi số lượng milestone (ô phía trên, ngoài form) và % của từng milestone."
+                )
+                milestone_rows_input = []
+                milestone_anchor_keys = list(PAYMENT_METHOD_MILESTONE_ANCHOR_LABELS.keys())
+                for m_idx in range(int(milestone_count_input)):
+                    default_m = (
+                        DEFAULT_PAYMENT_METHOD_MILESTONES[m_idx]
+                        if m_idx < len(DEFAULT_PAYMENT_METHOD_MILESTONES)
+                        else {"name": f"Milestone {m_idx + 1}", "anchor": "PRODUCT_DONE", "percent": 0.0}
+                    )
+                    mcol1, mcol2, mcol3 = st.columns([2, 3, 1.2])
+                    with mcol1:
+                        m_name = st.text_input(f"Tên milestone #{m_idx + 1}", value=default_m["name"], key=f"cc_ms_name_{m_idx}")
+                    with mcol2:
+                        m_anchor = st.selectbox(
+                            f"Mốc thời điểm #{m_idx + 1}",
+                            milestone_anchor_keys,
+                            index=milestone_anchor_keys.index(default_m["anchor"]),
+                            format_func=lambda k: PAYMENT_METHOD_MILESTONE_ANCHOR_LABELS[k],
+                            key=f"cc_ms_anchor_{m_idx}",
+                        )
+                    with mcol3:
+                        m_percent = st.number_input(
+                            f"% #{m_idx + 1}", min_value=0.0, max_value=100.0,
+                            value=float(default_m["percent"]), step=1.0, key=f"cc_ms_percent_{m_idx}",
+                        )
+                    milestone_rows_input.append({"name": m_name, "anchor": m_anchor, "percent": m_percent})
+
+                st.caption(
+                    f"**LC (Thư tín dụng)** — thu toàn bộ giá trị hợp đồng phần Project 1 lần vào "
+                    f"Due Date + {LC_DUE_DATE_OFFSET_DAYS} ngày, không cần nhập thêm tham số nào khác."
+                )
+
                 crisis_submit = st.form_submit_button("Xác nhận Crisis Card", type="primary", use_container_width=True)
 
             if crisis_submit:
@@ -3862,6 +4176,23 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                     "new_processing_fee_rate": new_processing_fee_rate_input if chg_fee else None,
                     "new_collateral_ratio": new_collateral_ratio_input if chg_collateral else None,
                 }
+
+                # [BỔ SUNG] PAYMENT_METHOD_MILESTONE — chỉ đóng gói milestones khi
+                # nhóm này thực sự được chọn, và chỉ giữ lại các dòng có % > 0 (dòng
+                # % = 0 coi như Founder chưa dùng đến, không đưa vào để tránh vi phạm
+                # ràng buộc percent > 0 của PaymentMethodMilestoneItem).
+                milestones_payload = None
+                if "PAYMENT_METHOD_MILESTONE" in crisis_group:
+                    valid_rows = [row for row in milestone_rows_input if row["percent"] > 0]
+                    if valid_rows:
+                        milestones_payload = [
+                            PaymentMethodMilestoneItem(
+                                name=row["name"] or "Milestone",
+                                anchor=row["anchor"],
+                                percent=float(row["percent"]),
+                            )
+                            for row in valid_rows
+                        ]
 
                 try:
                     crisis_card = CrisisCardInput(
@@ -3878,6 +4209,8 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                         new_collateral_ratio=finance_condition_fields["new_collateral_ratio"],
                         new_num_provinces=int(new_num_provinces_input) if new_num_provinces_input else None,
                         new_order_count=int(new_order_count_input) if new_order_count_input else None,
+                        performance_bond_amount=float(performance_bond_amount_input) if performance_bond_amount_input else None,
+                        milestones=milestones_payload,
                     )
                     validation_errors = validate_crisis_card_input(crisis_card)
                 except Exception as exc:
@@ -3917,6 +4250,8 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                                 new_collateral_ratio=extraction.new_collateral_ratio,
                                 new_num_provinces=extraction.new_num_provinces,
                                 new_order_count=extraction.new_order_count,
+                                performance_bond_amount=extraction.performance_bond_amount,
+                                milestones=extraction.milestones,
                                 raw_prompt_text=crisis_prompt_text.strip(),
                             )
                             validation_errors = validate_crisis_card_input(crisis_card)
@@ -3938,12 +4273,17 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                         baseline_metrics = result["finance_metrics"]
                         list_price_goc = baseline_metrics["total_list_price"]
 
+                        # Lấy sys_data TRƯỚC khi tính delta để resolve_crisis_deltas() có thể
+                        # tra 11_BANK_PRODUCTS tìm gói vay Performance Bond phù hợp (nếu có).
+                        sys_data = st.session_state.get("opc_data")
+
                         delta = resolve_crisis_deltas(
                             crisis_obj,
                             list_price_goc,
                             result["customer"].get("num_provinces"),
                             baseline_metrics.get("estimated_cost"),
                             result["opportunity"].get("initial_order_count"),
+                            data=sys_data,
                         )
 
                         # FIX (bug nghiêm trọng): trước đây vượt trần cứng ORDER_CHANGE làm
@@ -3978,7 +4318,6 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                                 },
                             }
                         else:
-                            sys_data = st.session_state.get("opc_data")
                             if not sys_data:
                                 raise ValueError("Chưa nạp Team Pack. Vui lòng quay lại tab Operations để tải Team Pack lên.")
 
@@ -4004,7 +4343,8 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
 
                             cp_after = project_closing_cash_with_crisis(
                                 sys_data, selected_products_df, fm_after, pd.to_datetime(result["opportunity"]["order_date"]),
-                                reserve_minimum, delta
+                                reserve_minimum, delta,
+                                due_date=pd.to_datetime(result["opportunity"]["due_date"]),
                             )
 
                             req_after = max(0.0, reserve_minimum - cp_after["min_projected_closing_cash"])
@@ -4139,7 +4479,19 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
                                     "risk_agent_output": r_res_after.model_dump() if r_res_after else None,
                                     "requested_amount_after": requested_amount_after,
                                     "finance_condition_warning": finance_condition_warning,
-                                    "final_decision": final_decision.model_dump()
+                                    "final_decision": final_decision.model_dump(),
+                                    # [BỔ SUNG] PERFORMANCE_BOND — gói vay bảo lãnh phù hợp (nếu có)
+                                    # và total_fee đã cộng vào estimated_cost, để hiển thị ở phần
+                                    # Finance của Crisis Card khi Founder thay đổi giá trị bảo lãnh.
+                                    "guarantee_result": {
+                                        "guarantee_amount": delta.guarantee_amount,
+                                        "guarantee_loan_option": delta.guarantee_loan_option,
+                                        "guarantee_total_fee": delta.guarantee_total_fee,
+                                    } if delta.guarantee_amount > 0 else None,
+                                    # [BỔ SUNG] PAYMENT_METHOD_MILESTONE / PAYMENT_METHOD_LC — spec
+                                    # phương thức thanh toán mới (nếu Crisis Card có đổi), để hiển thị
+                                    # ngay sau khối Performance Bond ở phần Finance của Crisis Card.
+                                    "payment_method_result": delta.payment_method_override,
                                 }
                     except Exception as e:
                         st.error(f"Lỗi hệ thống khi xử lý Crisis: {str(e)}")
@@ -4236,6 +4588,76 @@ Before / After và gọi AI Agent chốt phương án xử lý — áp dụng ch
             finance_condition_warning = c_res.get("finance_condition_warning")
             if finance_condition_warning:
                 st.warning(f"⚠️ {finance_condition_warning}")
+
+            # [BỔ SUNG] PERFORMANCE_BOND — nếu Crisis Card có thay đổi giá trị bảo
+            # lãnh hợp đồng, hiển thị ở đây (phần Finance) gói vay bảo lãnh phù hợp
+            # cùng total_fee đã cộng trực tiếp vào estimated_cost.
+            crisis_guarantee_result = c_res.get("guarantee_result")
+            if crisis_guarantee_result and crisis_guarantee_result.get("guarantee_amount", 0) > 0:
+                st.markdown(
+                    '<div class="dash-section-title dash-container" style="margin-top: 24px;">'
+                    '<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" '
+                    'viewBox="0 0 24 24" style="color: #d97706;"><path stroke-linecap="round" '
+                    'stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> '
+                    'Performance Bond</div>',
+                    unsafe_allow_html=True,
+                )
+                cg_loan = crisis_guarantee_result.get("guarantee_loan_option")
+                cg_loan_html = (
+                    f"{cg_loan['product_name']} — {cg_loan['bank']} "
+                    f"(lãi suất/phí năm {cg_loan['annual_rate_or_fee']:.2%}, phí xử lý {cg_loan['processing_fee_rate']:.2%})"
+                    if cg_loan
+                    else "Chưa có gói vay eligible trong 11_BANK_PRODUCTS cho khoản bảo lãnh này"
+                )
+                st.markdown(f"""
+<div class="dash-container" style="background: white; border-radius: 16px; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 16px;">
+<div style="font-size: 0.85rem; color: #64748b;">Giá trị bảo lãnh (Performance Bond): <strong>{format_vnd(crisis_guarantee_result['guarantee_amount'])}</strong></div>
+<div style="font-size: 1.15rem; color: #0f172a; font-weight: 700; margin-top: 10px;">Total Fee cộng vào estimated_cost: {format_vnd(crisis_guarantee_result.get('guarantee_total_fee', 0.0))}</div>
+<div style="font-size: 0.9rem; color: #334155; margin-top: 10px;">Gói vay bảo lãnh phù hợp: <strong>{cg_loan_html}</strong></div>
+</div>
+                """, unsafe_allow_html=True)
+
+            # [BỔ SUNG] PAYMENT_METHOD_MILESTONE / PAYMENT_METHOD_LC — đặt NGAY SAU
+            # khối Performance Bond. Hiển thị phương thức thanh toán mới (Milestone
+            # kèm % từng mốc, hoặc LC kèm ngày thu tiền) đã được dùng để tính lại
+            # dòng tiền cash-in hàng tháng ở project_closing_cash_with_crisis().
+            crisis_payment_method_result = c_res.get("payment_method_result")
+            if crisis_payment_method_result:
+                st.markdown(
+                    '<div class="dash-section-title dash-container" style="margin-top: 24px;">'
+                    '<svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" '
+                    'viewBox="0 0 24 24" style="color: #0ea5e9;"><path stroke-linecap="round" '
+                    'stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 12v-2M3 12a9 9 0 1018 0 9 9 0 00-18 0z"></path></svg> '
+                    'Phương thức Thanh toán (Payment Method)</div>',
+                    unsafe_allow_html=True,
+                )
+                if crisis_payment_method_result.get("method") == "MILESTONE":
+                    ms_rows_html = "".join(
+                        f'<div style="display:flex;justify-content:space-between;padding:6px 0;'
+                        f'border-bottom:1px solid #f1f5f9;font-size:0.9rem;color:#334155;">'
+                        f'<span>{m["name"]} <span style="color:#94a3b8;">'
+                        f'({PAYMENT_METHOD_MILESTONE_ANCHOR_LABELS.get(m["anchor"], m["anchor"])})</span></span>'
+                        f'<strong>{m["percent"]:.1f}%</strong></div>'
+                        for m in crisis_payment_method_result.get("milestones", [])
+                    )
+                    st.markdown(f"""
+<div class="dash-container" style="background: white; border-radius: 16px; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 16px;">
+<div style="font-size: 0.85rem; color: #64748b; margin-bottom: 8px;">Đổi sang thanh toán <strong>THEO MILESTONE</strong> cho phần dịch vụ Project — dòng tiền cash-in hàng tháng đã được tính lại theo % từng cột mốc:</div>
+{ms_rows_html}
+</div>
+                    """, unsafe_allow_html=True)
+                else:
+                    _due_date_for_lc = pd.to_datetime(result["opportunity"]["due_date"]) + pd.Timedelta(days=LC_DUE_DATE_OFFSET_DAYS)
+                    st.markdown(f"""
+<div class="dash-container" style="background: white; border-radius: 16px; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 16px;">
+<div style="font-size: 0.85rem; color: #64748b;">Đổi sang thanh toán <strong>LC (Thư tín dụng)</strong> cho phần dịch vụ Project.</div>
+<div style="font-size: 1.1rem; color: #0f172a; font-weight: 700; margin-top: 10px;">Thu toàn bộ giá trị hợp đồng vào: {_due_date_for_lc.date()} (Due Date + {LC_DUE_DATE_OFFSET_DAYS} ngày)</div>
+</div>
+                    """, unsafe_allow_html=True)
+
+                payment_method_warning = c_res.get("cash_projection", {}).get("payment_method_warning")
+                if payment_method_warning:
+                    st.warning(f"⚠️ {payment_method_warning}")
 
             st.markdown('<div class="dash-section-title dash-container" style="margin-top: 24px;"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: #3b82f6;"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg> Crisis Approval Gate</div>', unsafe_allow_html=True)
 
