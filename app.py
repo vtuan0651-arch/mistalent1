@@ -1264,7 +1264,7 @@ Quy tắc bắt buộc:
 - Nếu guarantee_loan_option là null, phải nêu rõ hiện chưa có gói vay eligible trong
   11_BANK_PRODUCTS cho khoản bảo lãnh này, Founder cần rà soát thêm.
 - warning_message: 1 đoạn ngắn (tối đa khoảng 60 từ), nêu rõ số tiền bảo lãnh cụ thể,
-  tỷ lệ % bảo lãnh, ngưỡng 300 triệu, và tên gói vay bảo lãnh phù hợp đã chọn (nếu có).
+  tỷ lệ % bảo lãnh, ngưỡng 300 triệu, và tên gói bảo lãnh phù hợp đã chọn (nếu có).
 - Không dùng lại nguyên văn protection_condition của Decision Card chính — đây là
   cảnh báo riêng cho khoản bảo lãnh hợp đồng.
 - Chỉ dựa trên payload được cung cấp, viết rõ ràng để Founder ra quyết định ngay.
@@ -4450,7 +4450,7 @@ và khuyến nghị quyết định dành cho Founder.
                 st.markdown(f"""
 <div class="dash-container" style="background: white; border-radius: 16px; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 16px;">
 <div style="font-size: 0.85rem; color: #64748b;">Tỷ lệ bảo lãnh: <strong>{guarantee_result['guarantee_percent']:.1f}%</strong> · Giá trị hợp đồng Project: <strong>{format_vnd(guarantee_result['project_contract_value'])}</strong></div>
-<div style="font-size: 1.15rem; color: #0f172a; font-weight: 700; margin-top: 10px;">Khoản vay bảo lãnh cần huy động: {format_vnd(guarantee_result['guarantee_amount'])}</div>
+<div style="font-size: 1.15rem; color: #0f172a; font-weight: 700; margin-top: 10px;">Khoản bảo lãnh cần huy động: {format_vnd(guarantee_result['guarantee_amount'])}</div>
 <div style="font-size: 0.9rem; color: #334155; margin-top: 10px;">Gói vay bảo lãnh phù hợp: <strong>{g_loan_html}</strong></div>
 </div>
                 """, unsafe_allow_html=True)
