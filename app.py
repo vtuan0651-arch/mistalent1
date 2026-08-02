@@ -4450,7 +4450,7 @@ và khuyến nghị quyết định dành cho Founder.
                 st.markdown(f"""
 <div class="dash-container" style="background: white; border-radius: 16px; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 16px;">
 <div style="font-size: 0.85rem; color: #64748b;">Tỷ lệ bảo lãnh: <strong>{guarantee_result['guarantee_percent']:.1f}%</strong> · Giá trị hợp đồng Project: <strong>{format_vnd(guarantee_result['project_contract_value'])}</strong></div>
-<div style="font-size: 1.15rem; color: #0f172a; font-weight: 700; margin-top: 10px;">Khoản bảo lãnh cần huy động: {format_vnd(guarantee_result['guarantee_amount'])}</div>
+<div style="font-size: 1.15rem; color: #0f172a; font-weight: 700; margin-top: 10px;">Giá trị gói bảo lãnh: {format_vnd(guarantee_result['guarantee_amount'])}</div>
 <div style="font-size: 0.9rem; color: #334155; margin-top: 10px;">Gói bảo lãnh phù hợp: <strong>{g_loan_html}</strong></div>
 </div>
                 """, unsafe_allow_html=True)
