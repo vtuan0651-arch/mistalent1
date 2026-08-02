@@ -2558,104 +2558,14 @@ div[data-testid="stAlertContainer"], .stAlert {
 )
 
 st.markdown("""
-<div style="text-align: center; margin-top: 6px; margin-bottom: 34px; position: relative; z-index: 50;">
-    <div style="
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 15px;
-        background: rgba(255, 255, 255, 0.85);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        padding: 14px 40px;
-        border-radius: 999px;
-        box-shadow: 0 8px 30px rgba(59, 130, 246, 0.12), inset 0 2px 4px rgba(255,255,255,0.8);
-        border: 1px solid rgba(226, 232, 240, 0.9);
-        animation: floatTitle 5s ease-in-out infinite;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    " class="hero-title-box">
-        <span style="font-size: 2.2rem; animation: pulseBot 2.5s infinite; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));">🤖</span>
-        <h1 style="
-            margin: 0;
-            font-family: 'Inter', sans-serif;
-            font-size: 2.05rem;
-            font-weight: 900;
-            background: linear-gradient(90deg, #1e3a8a, #3b82f6, #8b5cf6, #ec4899);
-            background-size: 200% auto;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            letter-spacing: -0.02em;
-            animation: textShine 4s linear infinite;
-        ">
-            OPC Multi-Agent Contract Decision System
-        </h1>
-    </div>
-    <div style="
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        margin-top: 22px;
-    ">
-        <span class="flow-chip">📦 Team Pack (CSV)</span>
-        <span class="flow-arrow">→</span>
-        <span class="flow-chip">💰 Finance Agent</span>
-        <span class="flow-arrow">→</span>
-        <span class="flow-chip">🛡️ Risk Agent</span>
-        <span class="flow-arrow">→</span>
-        <span class="flow-chip">🧭 Decision Agent</span>
-        <span class="flow-arrow">→</span>
-        <span class="flow-chip flow-chip-final">✅ Founder Approval</span>
-    </div>
+<div style="background:#0b1220;margin:-1rem -1rem 0 -1rem;padding:18px 40px 0 40px;">
+    <span style="font-family:'Courier New',monospace;font-weight:800;font-size:1.55rem;letter-spacing:1px;color:#2dd4bf;">OPC SYSTEM</span>
 </div>
 
 <style>
-@keyframes floatTitle {
-    0% { transform: translateY(0px); }
-    50% { transform: translateY(-6px); box-shadow: 0 15px 35px rgba(59, 130, 246, 0.18), inset 0 2px 4px rgba(255,255,255,0.8); }
-    100% { transform: translateY(0px); }
-}
-@keyframes pulseBot {
-    0% { transform: scale(1) rotate(0deg); }
-    25% { transform: scale(1.1) rotate(-5deg); filter: drop-shadow(0 0 10px rgba(59,130,246,0.4)); }
-    50% { transform: scale(1) rotate(0deg); }
-    75% { transform: scale(1.1) rotate(5deg); filter: drop-shadow(0 0 10px rgba(139,92,246,0.4)); }
-    100% { transform: scale(1) rotate(0deg); }
-}
-@keyframes textShine {
-    to { background-position: 200% center; }
-}
+/* ================== TOP NAVBAR (thay cho pill hero cũ) ================== */
 .hero-title-box:hover {
     transform: scale(1.02);
-}
-.flow-chip {
-    font-family: 'Inter', sans-serif;
-    font-size: 0.82rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    color: #334155;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    padding: 7px 14px;
-    border-radius: 999px;
-    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
-    transition: all 0.2s ease;
-}
-.flow-chip:hover {
-    transform: translateY(-2px);
-    border-color: #93c5fd;
-    box-shadow: 0 6px 14px rgba(59, 130, 246, 0.14);
-}
-.flow-chip-final {
-    background: linear-gradient(135deg, #ecfdf5, #d1fae5);
-    border-color: #6ee7b7;
-    color: #065f46;
-}
-.flow-arrow {
-    color: #93a7f0;
-    font-weight: 700;
-    font-size: 0.95rem;
 }
 
 /* ================== SIDEBAR — NỀN TỐI (giống ảnh mẫu ECharts Gallery) ================== */
@@ -2737,61 +2647,61 @@ result = st.session_state.get("opc_result")
 
 st.markdown("""
 <style>
-/* Khung bao quanh thanh tab chính, giúp tab nổi bật và rõ ràng hơn */
+/* Thanh tab chính -> nối liền với navbar tối phía trên (logo OPC SYSTEM), phẳng, không khung/bóng */
 div[data-testid="stTabs"] {
-    background: linear-gradient(180deg, #f8fafc, #f1f5f9);
-    border: 1px solid #e2e8f0;
-    border-radius: 18px;
-    padding: 10px 14px 0 14px;
-    margin-bottom: 24px;
-    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+    background: #0b1220;
+    border: none;
+    border-radius: 0;
+    padding: 0 40px;
+    margin: 0 -1rem 28px -1rem;
+    box-shadow: none;
 }
 
 div[data-testid="stTabs"] button[data-baseweb="tab"] {
-    height: 56px;
-    padding: 0 22px;
-    font-size: 1.1rem !important;
-    font-weight: 700 !important;
-    color: #64748b;
-    border-radius: 12px 12px 0 0;
+    height: 52px;
+    padding: 0 18px;
+    font-size: 1rem !important;
+    font-weight: 500 !important;
+    color: #94a3b8;
+    border-radius: 0;
     transition: all 0.2s ease;
 }
 
 div[data-testid="stTabs"] button[data-baseweb="tab"]:hover {
-    color: #4f46e5;
-    background: rgba(99, 102, 241, 0.06);
+    color: #e2e8f0;
+    background: transparent;
 }
 
 div[data-testid="stTabs"] button[data-baseweb="tab"] p {
-    font-size: 1.1rem !important;
-    font-weight: 700 !important;
+    font-size: 1rem !important;
+    font-weight: 500 !important;
 }
 
 div[data-testid="stTabs"] button[aria-selected="true"] {
-    color: #4338ca !important;
-    background: #ffffff;
-    border-bottom: 4px solid #6366f1 !important;
-    box-shadow: 0 -4px 14px rgba(99, 102, 241, 0.08);
+    color: #f8fafc !important;
+    background: transparent;
+    border-bottom: 2px solid #f8fafc !important;
+    box-shadow: none;
 }
 
 div[data-testid="stTabs"] [data-baseweb="tab-highlight"] {
-    background: linear-gradient(90deg, #4f46e5, #ec4899) !important;
-    height: 4px !important;
+    background: #f8fafc !important;
+    height: 2px !important;
 }
 
 div[data-testid="stTabs"] [data-baseweb="tab-border"] {
-    background-color: #e2e8f0 !important;
+    background-color: transparent !important;
 }
 
 /* ================== OPERATIONS TAB — REDESIGN (card trắng bo tròn, KPI card) ================== */
 
 .ops-hero {
-    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-    border: 1px solid #e2e8f0;
-    border-radius: 20px;
-    padding: 26px 30px;
-    margin-bottom: 23px;
-    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    margin-bottom: 24px;
+    box-shadow: none;
 }
 .ops-hero-title {
     display: flex;
@@ -2915,7 +2825,7 @@ div[data-testid="stTabs"] div[data-testid="stAlert"] div[data-testid="stMarkdown
 </style>
 """, unsafe_allow_html=True)
 
-tab_ops, tab_crisis, tab_dashboard = st.tabs(["⚙️ Operations (Input & Workflow)", "🆘 Crisis Card", "🏆 Decision Dashboard"])
+tab_ops, tab_crisis, tab_dashboard = st.tabs(["Operations (Input & Workflow)", "Crisis Card", "Decision Dashboard"])
 
 with tab_ops:
     st.markdown(
