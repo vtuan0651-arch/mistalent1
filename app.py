@@ -1549,15 +1549,14 @@ def resolve_crisis_deltas(
                 extra_list_price += list_price_goc * 0.01
                 notes.append(f"Giao sớm {crisis.days_deviation} ngày (<7 ngày): oper +0.5%, list price +1%")
         elif group == "DEADLINE_LATE":
-            base_cost_for_late = baseline_estimated_cost or 0.0
             if crisis.days_deviation and crisis.days_deviation >= 7:
                 extra_oper += 0.005
-                extra_estimated_cost +=  base_cost_for_late * 0.015
+                extra_estimated_cost +=   list_price_goc * 0.015
                 notes.append(f"Giao muộn {crisis.days_deviation} ngày (>= 7 ngày): oper +0.5%, estimated cost +1.5% giá trị HĐ")
             elif crisis.days_deviation and crisis.days_deviation > 0:
                 extra_oper += 0.0005
-                extra_estimated_cost +=  base_cost_for_late * 0.01
-                notes.append(f"Giao muộn {crisis.days_deviation} ngày (<7 ngày): oper +0.05%, estimated cost +1% giá trị HĐ")
+                extra_estimated_cost +=   list_price_goc * 0.01
+                notes.append(f"Giao muộn {crisis.days_deviation} ngày (<7 ngày): oper +0.05%, estimated cost + 1% giá trị HĐ")
         elif group == "COST_CHANGE":
             if crisis.extra_cost_percent is not None:
                 base_cost_for_percent = baseline_estimated_cost or 0.0
