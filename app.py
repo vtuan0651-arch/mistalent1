@@ -2647,13 +2647,24 @@ result = st.session_state.get("opc_result")
 
 st.markdown("""
 <style>
-/* Thanh tab chính -> nối liền với navbar tối phía trên (logo OPC SYSTEM), phẳng, không khung/bóng */
+/* Thanh tab chính -> nối liền với navbar tối phía trên (logo OPC SYSTEM), phẳng, không khung/bóng.
+   LƯU Ý: chỉ tô nền tối cho [data-baseweb="tab-list"] (thanh chứa các nút tab), TUYỆT ĐỐI
+   không tô div[data-testid="stTabs"] vì thẻ này bọc luôn toàn bộ nội dung của cả 3 tab bên
+   dưới -> nếu tô nền tối ở đây thì cả trang bị đen theo. */
 div[data-testid="stTabs"] {
-    background: #0b1220;
+    background: transparent;
     border: none;
     border-radius: 0;
+    padding: 0;
+    margin: 0;
+    box-shadow: none;
+}
+
+div[data-testid="stTabs"] [data-baseweb="tab-list"] {
+    background: #0b1220;
     padding: 0 40px;
     margin: 0 -1rem 28px -1rem;
+    border-radius: 0;
     box-shadow: none;
 }
 
