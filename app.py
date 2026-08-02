@@ -1021,9 +1021,12 @@ def build_guarantee_partner_matrix(
     cash_projection hiện có — nó là một nhu cầu vốn ĐỘC LẬP với dòng tiền dự phóng
     (khác build_partner_matrix() vốn chỉ chạy khi cash_projection["cash_reserve_breach"]
     =True để bù đắp RR-002). Hàm này chuyển guarantee_amount sang bước tìm gói vay phù
-    hợp riêng, dùng lại đúng logic Lọc 4 Lớp: Lớp 1 — chỉ giữ credit_cash (loại
-    account_ops/credit_guarantee/unclassified); Lớp 2 — eligible khi guarantee_amount
-    đạt đủ minimum_amount; Lớp 3 — so sánh tổng chi phí (annual_rate_or_fee +
+    hợp riêng, dùng lại logic Lọc 4 Lớp nhưng ĐÚNG mục đích bảo lãnh hợp đồng: Lớp 1 —
+    CHỈ giữ nhóm "credit_guarantee" (Tín dụng — bảo lãnh/hỗ trợ giao dịch, VD:
+    performance bond, trade finance/LC — theo đúng bảng phân loại "Phân loại sản phẩm
+    ngân hàng"), loại account_ops/credit_cash/unclassified vì đây là khoản BẢO LÃNH,
+    không phải vay bơm tiền mặt trực tiếp; Lớp 2 — eligible khi guarantee_amount đạt đủ
+    minimum_amount; Lớp 3 — so sánh tổng chi phí (annual_rate_or_fee +
     processing_fee_rate); Lớp 4 — ưu tiên collateral_ratio thấp hơn khi Lớp 3 bằng nhau.
     """
     if guarantee_amount <= 0:
@@ -1035,7 +1038,7 @@ def build_guarantee_partner_matrix(
         category, _reason = classify_bank_product(
             str(product["product_name"]), str(product.get("description", ""))
         )
-        if category != "credit_cash":
+        if category != "credit_guarantee":
             continue
 
         min_amount = float(product["minimum_amount"])
